@@ -1,11 +1,18 @@
+# Use official Python slim — install only what's needed
 FROM python:3.11-slim
 
+ENV DEBIAN_FRONTEND=noninteractive
+ENV HOME=/root
+
+# Install LibreOffice headless (minimal set) + fonts
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libreoffice-writer \
-    libreoffice-common \
     fonts-liberation \
-    fonts-dejavu \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
+    fonts-dejavu-core \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create a fake home for LibreOffice (needs writable user dir)
+RUN mkdir -p /root/.config
 
 WORKDIR /app
 
