@@ -41,8 +41,8 @@ DOCX_PATH  = Path(__file__).parent / "template.docx"
 
 GEMINI_MODELS = [
     "gemini-2.5-flash",
-    "gemini-1.5-flash",
-    "gemini-1.5-flash-8b",
+    "gemini-2.5-flash-lite",
+    "gemini-3.1-flash-lite-preview",
 ]
 
 # ═══════════════════════════════════════════════════════════════════
