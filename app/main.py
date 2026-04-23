@@ -37,7 +37,8 @@ app.add_middleware(
 )
 
 GEMINI_KEY = os.environ.get("GEMINI_KEY", "")
-DOCX_PATH  = Path(__file__).parent / "template.docx"
+DOCX_PATH    = Path(__file__).parent / "template.docx"
+CL_DOCX_PATH = Path(__file__).parent / "cover_letter_template.docx"
 
 GEMINI_MODELS = [
     "gemini-2.5-flash",
@@ -384,11 +385,18 @@ Company: {company or "(not specified)"}
    3-4 = Weak (significant gaps, stretching required)
    1-2 = Poor (unrelated field, too senior, wrong domain)
 
-3. **ats_keywords** (12-15 exact short phrases from JD, max 4 words each):
-   - Must appear VERBATIM in the JD
-   - Only include keywords Vishal TRUTHFULLY has (skip things like Kubernetes if he hasn't used them)
-   - Include: job title, tools, methodologies, domain terms
-   - Prefer specific over generic (e.g. "ServiceNow CMDB" over "software")
+3. **ats_keywords** (8-12 keywords, max 3 words each):
+   CRITICAL: Only include keywords Vishal GENUINELY has experience with per the TRUTH ANCHOR.
+
+   Vishal has NEVER used (DO NOT INCLUDE): Shopify, HubSpot, Salesforce, SAP, LeanIX, Kubernetes,
+   Docker production, Terraform, Azure, GCP, Google Cloud, Jenkins, Snowflake, Databricks, Tableau,
+   PowerBI, Figma, Adobe, any CRM, any marketing tool, any e-commerce platform, D2C platforms.
+
+   Vishal DOES have: ServiceNow, CMDB, ITAM, REST APIs, GraphQL, Python, Golang, C++, JavaScript,
+   AWS, MongoDB, PostgreSQL, JIRA, Confluence, Git, Agile Scrum, Stakeholder Management, CSA, CAD.
+
+   Return keywords in the JD's original language (English or German), NEVER wrap in backticks or quotes.
+   Prefer specific (ServiceNow CMDB) over generic (software).
 
 4. **projects** (array of 1-2 project IDs to emphasize):
    P1=Formula Student (leadership/automotive/embedded)
@@ -527,10 +535,12 @@ def build_tailor_prompt(req: TailorRequest) -> str:
     kw_section = ""
     if req.ats_keywords:
         kw_section = (
-            "\n===== ATS KEYWORDS (weave in where TRUTHFUL) =====\n"
-            "Integrate these exact phrases naturally where Vishal GENUINELY has the experience.\n"
-            "Do NOT stuff. Do NOT add keywords Vishal doesn't have.\n"
-            f"Keywords: {', '.join(req.ats_keywords)}\n"
+            "\n===== ATS KEYWORDS =====\n"
+            "Integrate these phrases naturally in plain English (or plain German if that's the JD language).\n"
+            "NEVER wrap them in backticks, quotes, or any special characters.\n"
+            "ONLY use a keyword if Vishal has genuine experience with it per the TRUTH ANCHOR.\n"
+            "If a keyword maps to something Vishal hasn't used, SKIP IT silently.\n"
+            f"Keywords to try: {', '.join(req.ats_keywords)}\n"
         )
 
     proj_section = ""
@@ -571,16 +581,45 @@ KILL LIST: {cfg['kill_list']}
 
 AVAILABILITY: {cfg['availability']}
 {kw_section}{proj_section}
-===== ABSOLUTE RULES =====
-1. NEVER invent facts, tools, or achievements not in TRUTH ANCHOR above.
-   If in doubt, omit. Fabrication destroys Vishal's interviews.
-2. Rephrase and reorder ONLY — do not add technologies Vishal hasn't used.
-3. Summary: 4-5 sentences. Specific, not generic. End with availability statement.
-4. Skill categories: use EXACTLY the 6 labels in skill_labels below.
-   Fill with tools/skills from TRUTH ANCHOR only.
-5. Return EXACTLY 6 skill_values, 8 sde_bullets, 7 ase_bullets.
-6. Bullets: most JD-relevant first. Use the voice specified above.
-7. Respect the KILL LIST — those terms must not appear.
+===== ABSOLUTE HARD RULES — VIOLATIONS = AUTO-REJECT =====
+
+RULE 1 — ZERO HALLUCINATION:
+- Only use tools/technologies/skills that appear EXPLICITLY in the TRUTH ANCHOR
+- Vishal has NEVER used: Shopify, HubSpot, Salesforce, SAP, LeanIX, Kubernetes, Docker production, Terraform,
+  Azure, GCP/Google Cloud, Jenkins, Snowflake, Databricks, Tableau, PowerBI, Figma, Jira Admin, Slack admin,
+  SharePoint dev, Adobe, any CRM tool, any marketing tool, any e-commerce platform
+- If the JD mentions a tool Vishal has never used: DO NOT include it anywhere — not in skills, not in bullets, not in summary
+- Even if the JD emphasizes it, skip it. Missing 1 keyword is better than lying about 1 keyword.
+
+RULE 2 — NO BACKTICKS, NO GERMAN QUOTED WORDS:
+- NEVER wrap any word in backticks (`word`) or single-quotes in the output
+- Write English naturally; write German naturally — NEVER mix them with quotes/backticks
+- Backticks in resume text = instant AI-detection = auto-reject by recruiter
+- If the JD is in German but Vishal's resume is English, KEEP RESUME FULLY ENGLISH
+- Do NOT translate individual German words into the English resume
+
+RULE 3 — SKILL CATEGORY INTEGRITY:
+- Each skill_value MUST match its skill_label semantically
+- Example: "Cloud & Databases" row must contain cloud/database tools, NOT programming languages
+- Example: "Product & Strategy" row must contain PM concepts, NOT code libraries
+- Before outputting, verify each label-value pairing makes sense
+
+RULE 4 — STRUCTURE:
+- Summary: exactly 4 sentences. No more, no less.
+- skill_labels: EXACTLY the 6 provided below — DO NOT modify
+- skill_values: EXACTLY 6, each semantically matching its label
+- sde_bullets: EXACTLY 8
+- ase_bullets: EXACTLY 7
+
+RULE 5 — CONTENT QUALITY:
+- Bullets start with strong verbs from the voice/tone specified
+- Most JD-relevant bullet first
+- No filler phrases ("leveraging", "results-driven", "passionate about")
+- Respect KILL LIST — those terms must not appear anywhere
+
+RULE 6 — SUMMARY ENDING:
+- Summary MUST end with the availability sentence exactly as given
+- Do not paraphrase the availability line
 
 ===== OUTPUT — VALID JSON ONLY, NO MARKDOWN =====
 {{
@@ -645,11 +684,11 @@ def build_cl_prompt(req: TailorRequest) -> str:
     )
 
     lang_inst = (
-        "Write in GERMAN (formal Sie form, no du). Opening: 'Sehr geehrtes Recruiting-Team,'. "
-        "Closing: 'Mit freundlichen Grüßen,'."
+        "Write in GERMAN (formal Sie form, no du)."
         if is_de else
-        "Write in ENGLISH. Opening: 'Dear Hiring Team,'. Closing: 'Kind regards,'."
+        "Write in ENGLISH."
     )
+    lang_note = "GERMAN throughout — formal Sie form. NEVER mix in English words or backticked terms." if is_de else "ENGLISH throughout. NEVER wrap German words in backticks or quotes."
 
     return f"""Write a professional cover letter for Vishal Mahesh Kumar.
 
@@ -670,22 +709,23 @@ Availability: {cfg['availability']}
 ===== REQUIREMENTS =====
 - {lang_inst}
 - Length: {length}
-- Structure:
-  Para 1: Strong opening, name the company, ONE specific JD detail, why Vishal fits
-  Para 2: Connect Vishal's Flexera experience to JD requirements concretely
-  Para 3: Mention RWTH MME-TIME with relevant modules
-  Para 4 (if longer version): Availability + closing interest
-- NEVER write:
-    * "I am a highly motivated..."
-    * "I am writing to apply for..."
-    * "Please find my application attached"
-    * Generic filler
-- Sign off: Vishal Mahesh Kumar
-- No address block, no date, no subject line — just letter body
-- Use ONLY facts from TRUTH ANCHOR — no invented achievements
+- Structure: EXACTLY 5 body paragraphs, separated by \n\n (double newline):
+  Para 1 (hook): Strong opening, mention company name, one specific JD detail, why Vishal fits
+  Para 2 (experience): Map Vishal's Flexera work concretely to the JD requirements
+  Para 3 (studies): Mention RWTH MME-TIME + relevant modules
+  Para 4 (cross-functional): Communication, collaboration, working style — grounded in real experience
+  Para 5 (closing): Availability + enthusiasm for interview
+
+- NO greeting line (the template already has "Sehr geehrtes Recruiting-Team,")
+- NO sign-off line (the template already has "Mit freundlichen Grüßen / Vishal Mahesh Kumar")
+- Output ONLY the 5 body paragraphs separated by \n\n
+- NEVER write: "I am a highly motivated...", "I am writing to apply for...", "Please find my application attached", generic filler
+- NEVER wrap any word in backticks or single quotes
+- Use ONLY facts from TRUTH ANCHOR — no invented achievements, no Shopify/HubSpot/SAP/etc.
+- Language: {lang_note}
 
 ===== OUTPUT — VALID JSON ONLY =====
-{{"letter": "para1\\n\\npara2\\n\\npara3\\n\\n(optional para4)\\n\\nSign-off line\\nVishal Mahesh Kumar"}}"""
+{{"letter": "para1\\n\\npara2\\n\\npara3\\n\\npara4\\n\\npara5"}}"""
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -723,6 +763,50 @@ def patch_docx(ai: dict) -> bytes:
 
     file_map["word/document.xml"] = xml.encode("utf-8")
 
+    out = io.BytesIO()
+    with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as zout:
+        for n in names:
+            zout.writestr(n, file_map[n])
+    return out.getvalue()
+
+
+# ═══════════════════════════════════════════════════════════════════
+# COVER LETTER DOCX ANCHORS — body paragraphs
+# ═══════════════════════════════════════════════════════════════════
+CL_ORIG_PARAS = [
+    # Para 1 — intro / hook
+    "hiermit bewerbe ich mich um eine Werkstudentenposition im IT- bzw. Technologiebereich. Derzeit studiere ich Management &amp; Engineering (Technology, Innovation, Marketing &amp; Entrepreneurship) im Masterstudiengang an der RWTH Aachen University und bringe mehr als drei Jahre praktische Erfahrung im Software- und Enterprise-IT-Umfeld mit.",
+    # Para 2 — experience detail
+    "In meiner bisherigen beruflichen Tätigkeit war ich an der Entwicklung, Betreuung und Optimierung von IT-Systemen beteiligt. Dabei arbeitete ich unter anderem mit ServiceNow, CMDB, IT Asset Management, REST- und GraphQL-APIs, sowie mit Programmiersprachen wie JavaScript, Golang, Python und C++. Zusätzlich habe ich Erfahrung im Umgang mit Cloud-Umgebungen (AWS), Datenbanken und strukturierten Datenverarbeitungsprozessen. Mein Fokus lag dabei stets auf stabilen, wartbaren und skalierbaren IT-Lösungen.",
+    # Para 3 — studies
+    "Aktuell vertiefe ich im Studium insbesondere meine Kenntnisse in den Bereichen Data Analysis, Strategic Management, Innovation Management, Marketing Management, Leadership sowie Qualitative Research Methods. Diese Inhalte ermöglichen es mir, technische Fragestellungen nicht nur aus Entwickler-, sondern auch aus prozessualer und betriebswirtschaftlicher Perspektive zu betrachten.",
+    # Para 4 — cross-functional
+    "Neben der technischen Umsetzung habe ich regelmäßig mit unterschiedlichen Fachbereichen zusammengearbeitet, technische Sachverhalte verständlich aufbereitet und operative Abläufe unterstützt. Dadurch konnte ich ein gutes Verständnis für IT-Prozesse, Systemzuverlässigkeit und praxisorientierte Problemlösung entwickeln.",
+    # Para 5 — closing pitch
+    "Ich arbeite strukturiert, verantwortungsbewusst und eigenständig und bringe eine hohe Lernbereitschaft sowie ein ausgeprägtes Qualitätsbewusstsein mit. Gerne möchte ich mein Wissen aus dem Studium mit praktischer Erfahrung verbinden und aktiv zum Erfolg Ihres Unternehmens beitragen.",
+]
+
+def patch_cover_letter_docx(letter_text: str) -> bytes:
+    """Replace the 5 body paragraphs in the CL template with new paragraphs from Gemini."""
+    paras = [p.strip() for p in letter_text.split("\n\n") if p.strip()]
+    # Drop greeting / sign-off lines if Gemini included them
+    paras = [p for p in paras if not p.lower().startswith(("sehr geehrt", "dear ", "mit freundlich", "kind regards", "vishal mahesh"))]
+
+    # Ensure exactly 5 paragraphs — pad or trim
+    while len(paras) < 5:
+        paras.append("")
+    paras = paras[:5]
+
+    with zipfile.ZipFile(io.BytesIO(CL_DOCX_PATH.read_bytes()), "r") as zin:
+        names    = zin.namelist()
+        file_map = {n: zin.read(n) for n in names}
+
+    xml = file_map["word/document.xml"].decode("utf-8")
+    for i, new_para in enumerate(paras):
+        if new_para and i < len(CL_ORIG_PARAS):
+            xml = xml.replace(CL_ORIG_PARAS[i], xml_enc(new_para))
+
+    file_map["word/document.xml"] = xml.encode("utf-8")
     out = io.BytesIO()
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as zout:
         for n in names:
@@ -782,12 +866,17 @@ async def tailor(req: TailorRequest):
     if not DOCX_PATH.exists():
         raise HTTPException(500, "template.docx missing.")
 
-    ai = await call_gemini(build_tailor_prompt(req), temp=0.35)
+    ai = await call_gemini(build_tailor_prompt(req), temp=0.15)
 
-    cover_letter = ""
+    cover_letter_pdf_b64 = ""
     if req.cover_letter:
-        cl_result    = await call_gemini(build_cl_prompt(req), temp=0.4)
-        cover_letter = cl_result.get("letter", "")
+        cl_result = await call_gemini(build_cl_prompt(req), temp=0.25)
+        letter_text = cl_result.get("letter", "")
+        if letter_text:
+            # Patch the cover letter DOCX template and convert to PDF
+            cl_docx  = patch_cover_letter_docx(letter_text)
+            cl_pdf   = docx_to_pdf(cl_docx)
+            cover_letter_pdf_b64 = base64.b64encode(cl_pdf).decode()
 
     docx_bytes = patch_docx(ai)
     pdf_bytes  = docx_to_pdf(docx_bytes)
@@ -807,7 +896,7 @@ async def tailor(req: TailorRequest):
     )
 
     headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
-    if cover_letter:
-        headers["X-Cover-Letter"] = base64.b64encode(cover_letter.encode()).decode()
+    if cover_letter_pdf_b64:
+        headers["X-Cover-Letter-Pdf"] = cover_letter_pdf_b64
 
     return Response(content=pdf_bytes, media_type="application/pdf", headers=headers)

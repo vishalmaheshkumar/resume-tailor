@@ -22,5 +22,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY app/main.py .
 COPY app/start.py .
 COPY template.docx .
+COPY cover_letter_template.docx .
 
 CMD ["python", "start.py"]
