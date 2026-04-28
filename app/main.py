@@ -181,14 +181,16 @@ P3. IoT Research Project
     - ATmega328p, ESP8266 Wi-Fi, ThingSpeak Cloud
     TAGS: IoT, embedded, cloud, sensors
 
-P4. AI Resume Tailoring Tool (PERSONAL, recent)
-    - React app using LLM APIs (Anthropic/Gemini)
-    - Word-level diff, JD-driven tailoring
-    TAGS: AI, LLM integration, React, product-building, problem solving
+P4. AI Resume Tailoring Tool (PERSONAL SIDE PROJECT, recent)
+    - Small personal web tool built with LLM APIs (Anthropic/Gemini)
+    - Word-level diff, JD-driven tailoring for own job hunt
+    TAGS: AI, LLM integration, personal project, self-initiated
+    NOTE: Personal project — DO NOT claim as professional React experience
 
-P5. Job Scanner Application (PERSONAL, recent)
-    - React app with live search across LinkedIn, Indeed, StepStone
-    TAGS: React, API integration, automation, web scraping, job market
+P5. Job Scanner Application (PERSONAL SIDE PROJECT, recent)
+    - Personal tool with live search across LinkedIn, Indeed, StepStone
+    TAGS: API integration, automation, personal project, self-initiated
+    NOTE: Personal project — DO NOT claim as professional web dev experience
 
 P6. BlastMap AI (CONCEPT based on CMDB work)
     - CMDB blast radius analyzer — downstream impact of CI changes
@@ -388,12 +390,20 @@ Company: {company or "(not specified)"}
 3. **ats_keywords** (8-12 keywords, max 3 words each):
    CRITICAL: Only include keywords Vishal GENUINELY has experience with per the TRUTH ANCHOR.
 
-   Vishal has NEVER used (DO NOT INCLUDE): Shopify, HubSpot, Salesforce, SAP, LeanIX, Kubernetes,
-   Docker production, Terraform, Azure, GCP, Google Cloud, Jenkins, Snowflake, Databricks, Tableau,
-   PowerBI, Figma, Adobe, any CRM, any marketing tool, any e-commerce platform, D2C platforms.
+   Vishal has NEVER used at work (DO NOT INCLUDE as professional experience): Shopify, HubSpot,
+   Salesforce, SAP, LeanIX, Kubernetes, Docker production, Terraform, Azure, GCP, Google Cloud,
+   Jenkins, Snowflake, Databricks, Tableau, PowerBI, Figma, Adobe, any CRM, any marketing tool,
+   any e-commerce/D2C platform, Next.js, Vue, Angular, Node.js backend, TypeScript production,
+   React Native, Flutter, mobile development, Terraform, Ansible, Spring Boot, .NET, Ruby, PHP.
 
-   Vishal DOES have: ServiceNow, CMDB, ITAM, REST APIs, GraphQL, Python, Golang, C++, JavaScript,
-   AWS, MongoDB, PostgreSQL, JIRA, Confluence, Git, Agile Scrum, Stakeholder Management, CSA, CAD.
+   React: ONLY mention in personal projects context (AI Resume Tool, Job Scanner) — NEVER claim
+   "3 years React experience" or put it in main skills. Do not list React in skill categories
+   unless the JD specifically asks for React AND you're framing it as a personal project skill.
+
+   Vishal DOES have (professional enterprise experience):
+   ServiceNow (CSA+CAD), CMDB, ITAM, REST APIs, GraphQL, Python, Golang, C++, JavaScript (server-side),
+   AWS, MongoDB, PostgreSQL, JIRA, Confluence, Git, Agile Scrum, Stakeholder Management,
+   Customer Interactions (NAM/EU/APAC), OpenAI API / MCP prototypes, Automated Testing (ATF).
 
    Return keywords in the JD's original language (English or German), NEVER wrap in backticks or quotes.
    Prefer specific (ServiceNow CMDB) over generic (software).
@@ -455,7 +465,7 @@ def track_config(track: str) -> dict:
                 "Soften senior signals to avoid overqualification rejection."
             ),
             "kill_list": (
-                "Do NOT mention: GraphQL, Golang, FlexeraOne/FNMS product names, "
+                "Do NOT mention: Golang, FlexeraOne/FNMS product names, "
                 "MCP/OpenAI Protocol, deep AWS internals, '70% architecture redesign' "
                 "(too senior-sounding for Werkstudent)."
             ),
@@ -480,9 +490,11 @@ def track_config(track: str) -> dict:
                 "Summary leads with RWTH MME-TIME + strategic intent + Flexera grounding."
             ),
             "kill_list": (
-                "Do NOT mention: Robust Transform Engine/RTE, Transform Maps, Script Includes "
-                "(too technical), Golang, GraphQL, AWS internals. "
-                "FlexeraOne/FNMS — mention sparingly as product context only."
+                "ABSOLUTELY DO NOT mention anywhere (not in summary, bullets, skills, or cover letter): "
+                "Robust Transform Engine, RTE, Transform Maps, Script Includes, Business Rules, "
+                "Golang, AWS internals, sysparm_limit, sysparm_offset, MCP code-level details. "
+                "These signal 'developer' and undermine the PM/EA candidacy. "
+                "FlexeraOne/FNMS — mention sparingly as product context only, never as code."
             ),
             "skill_labels": [
                 "Product & Strategy: ",
@@ -585,11 +597,15 @@ AVAILABILITY: {cfg['availability']}
 
 RULE 1 — ZERO HALLUCINATION:
 - Only use tools/technologies/skills that appear EXPLICITLY in the TRUTH ANCHOR
-- Vishal has NEVER used: Shopify, HubSpot, Salesforce, SAP, LeanIX, Kubernetes, Docker production, Terraform,
-  Azure, GCP/Google Cloud, Jenkins, Snowflake, Databricks, Tableau, PowerBI, Figma, Jira Admin, Slack admin,
-  SharePoint dev, Adobe, any CRM tool, any marketing tool, any e-commerce platform
-- If the JD mentions a tool Vishal has never used: DO NOT include it anywhere — not in skills, not in bullets, not in summary
-- Even if the JD emphasizes it, skip it. Missing 1 keyword is better than lying about 1 keyword.
+- Vishal has NEVER used PROFESSIONALLY: Shopify, HubSpot, Salesforce, SAP, LeanIX, Kubernetes,
+  Docker production, Terraform, Azure, GCP, Google Cloud, Jenkins, Snowflake, Databricks, Tableau,
+  PowerBI, Figma, Adobe, any CRM, any marketing tool, any e-commerce/D2C platform, Next.js, Vue,
+  Angular, Node.js backend, TypeScript production, React Native, Flutter, mobile dev, Ansible,
+  Spring Boot, .NET, Ruby, PHP, Java production.
+- React: ONLY in personal projects context (if mentioned at all). Never in main skills section.
+  Never claim React experience. Even if JD asks for React heavily — skip it.
+- If the JD mentions a tool Vishal has never used: DO NOT include it anywhere.
+- Missing 1 keyword is ALWAYS better than fabricating 1 keyword. Interviews catch lies.
 
 RULE 2 — NO BACKTICKS, NO GERMAN QUOTED WORDS:
 - NEVER wrap any word in backticks (`word`) or single-quotes in the output
@@ -620,6 +636,31 @@ RULE 5 — CONTENT QUALITY:
 RULE 6 — SUMMARY ENDING:
 - Summary MUST end with the availability sentence exactly as given
 - Do not paraphrase the availability line
+
+RULE 7 — VOICE / GRAMMATICAL PERSON:
+- Resume summary is in IMPLICIT FIRST PERSON — no "I", no "Vishal", no "he/she", no name
+- WRONG: "Vishal is an M.Sc. candidate..." or "He has driven..."
+- WRONG: "I am an M.Sc. candidate..."
+- RIGHT: "M.Sc. candidate in Management & Engineering with 3+ years of enterprise SaaS experience..."
+- RIGHT: "Combines technical foundation with strategic product thinking..."
+- Bullets: ALWAYS start with action verb, NEVER with "I" or pronoun
+- WRONG: "I designed APIs..." or "He led the redesign..."
+- RIGHT: "Designed APIs..." or "Led the redesign..."
+
+RULE 8 — REACT / FRAMEWORKS:
+- Vishal has NOT used React, Vue, Angular, or any frontend framework professionally
+- React was used ONLY in personal projects (AI Resume Tool, Job Scanner) — fine to mention there
+- DO NOT list React in the main TECHNICAL SKILLS section
+- DO NOT add React, Vue, Angular, frontend frameworks, or UI libraries to skill_values
+
+RULE 9 — SKILL CATEGORY ROW MEANING:
+- "Backend & Integration" → ServiceNow, REST APIs, GraphQL, server-side scripting, integrations
+- "AI & Protocols" → ONLY AI/ML/LLM specific items (OpenAI, MCP, Vector DBs, LLMs) — NOT data modeling
+- "Cloud & Databases" → AWS, MongoDB, PostgreSQL, S3, CloudWatch — NOT programming languages
+- "Tools & Certifications" → JIRA, Git, Confluence + cert names
+- "Product & Strategy" → Innovation, Strategic Mgmt, Roadmap, Stakeholder Mgmt — NOT code or APIs
+- "Stakeholder & Delivery" → Customer Engagement, Vendor Mgmt, Cross-functional Collab, Agile
+- If a skill doesn't fit any category cleanly, DROP IT instead of forcing it
 
 ===== OUTPUT — VALID JSON ONLY, NO MARKDOWN =====
 {{
@@ -699,6 +740,7 @@ Role: {role}
 Company: {req.company or "the hiring company"}
 Track: {req.track}
 Availability: {cfg['availability']}
+Kill List (NEVER mention these): {cfg['kill_list']}
 
 ===== JOB DESCRIPTION =====
 {req.jd[:2500]}
@@ -709,23 +751,30 @@ Availability: {cfg['availability']}
 ===== REQUIREMENTS =====
 - {lang_inst}
 - Length: {length}
-- Structure: EXACTLY 5 body paragraphs, separated by \n\n (double newline):
-  Para 1 (hook): Strong opening, mention company name, one specific JD detail, why Vishal fits
-  Para 2 (experience): Map Vishal's Flexera work concretely to the JD requirements
-  Para 3 (studies): Mention RWTH MME-TIME + relevant modules
-  Para 4 (cross-functional): Communication, collaboration, working style — grounded in real experience
-  Para 5 (closing): Availability + enthusiasm for interview
+- Structure: EXACTLY 5 body paragraphs, separated by \n\n (double newline)
+- LENGTH IS CRITICAL — TOTAL must fit on ONE PAGE (sidebar template leaves ~9cm width):
+  * Total word count: 200-240 words MAXIMUM (counting all 5 paragraphs combined)
+  * Each paragraph: 35-55 words ONLY — short and punchy
+  * If you exceed 240 words total, the cover letter overflows to page 2 — AUTO-REJECT
+- Paragraph purposes (each 2-3 sentences MAX):
+  Para 1 (hook): Company name + specific JD detail + why Vishal fits (2 sentences)
+  Para 2 (experience): One concrete Flexera achievement mapped to JD requirements (2-3 sentences)
+  Para 3 (studies): RWTH MME-TIME + 2-3 relevant modules (2 sentences)
+  Para 4 (working style): Cross-functional / customer / leadership angle (2 sentences)
+  Para 5 (closing): Availability + interest in conversation (1-2 sentences)
 
-- NO greeting line (the template already has "Sehr geehrtes Recruiting-Team,")
-- NO sign-off line (the template already has "Mit freundlichen Grüßen / Vishal Mahesh Kumar")
+- NO greeting line (template already has "Sehr geehrtes Recruiting-Team,")
+- NO sign-off (template already has "Mit freundlichen Grüßen / Vishal Mahesh Kumar")
+- NO "Über eine Einladung..." line — template already has it
 - Output ONLY the 5 body paragraphs separated by \n\n
-- NEVER write: "I am a highly motivated...", "I am writing to apply for...", "Please find my application attached", generic filler
-- NEVER wrap any word in backticks or single quotes
-- Use ONLY facts from TRUTH ANCHOR — no invented achievements, no Shopify/HubSpot/SAP/etc.
+- NEVER: "I am a highly motivated", "I am writing to apply", "Please find attached", generic filler
+- NEVER wrap any word in backticks or quotes
+- ONLY use facts from TRUTH ANCHOR — no Shopify/HubSpot/SAP/React-as-skill
+- RESPECT the kill list for the track (e.g. for werk_pm: NO Golang, NO RTE/Transform Maps)
 - Language: {lang_note}
 
 ===== OUTPUT — VALID JSON ONLY =====
-{{"letter": "para1\\n\\npara2\\n\\npara3\\n\\npara4\\n\\npara5"}}"""
+{{"letter": "para1\\n\\npara2\\n\\npara3\\n\\npara4"}}"""
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -787,15 +836,17 @@ CL_ORIG_PARAS = [
 ]
 
 def patch_cover_letter_docx(letter_text: str) -> bytes:
-    """Replace the 5 body paragraphs in the CL template with new paragraphs from Gemini."""
+    """Replace first 4 body paragraphs with Gemini content; clear the 5th to keep single-page."""
     paras = [p.strip() for p in letter_text.split("\n\n") if p.strip()]
-    # Drop greeting / sign-off lines if Gemini included them
-    paras = [p for p in paras if not p.lower().startswith(("sehr geehrt", "dear ", "mit freundlich", "kind regards", "vishal mahesh"))]
+    # Drop greeting / sign-off lines if Gemini included them anyway
+    paras = [p for p in paras if not p.lower().startswith(
+        ("sehr geehrt", "dear ", "mit freundlich", "kind regards", "vishal mahesh", "sincerely", "best regards")
+    )]
 
-    # Ensure exactly 5 paragraphs — pad or trim
-    while len(paras) < 5:
+    # Pad to exactly 5 slots — last slot will be cleared to prevent overflow
+    while len(paras) < 4:
         paras.append("")
-    paras = paras[:5]
+    paras = paras[:4] + [""]  # 5th slot intentionally empty
 
     with zipfile.ZipFile(io.BytesIO(CL_DOCX_PATH.read_bytes()), "r") as zin:
         names    = zin.namelist()
@@ -803,8 +854,10 @@ def patch_cover_letter_docx(letter_text: str) -> bytes:
 
     xml = file_map["word/document.xml"].decode("utf-8")
     for i, new_para in enumerate(paras):
-        if new_para and i < len(CL_ORIG_PARAS):
-            xml = xml.replace(CL_ORIG_PARAS[i], xml_enc(new_para))
+        if i < len(CL_ORIG_PARAS):
+            # For the 5th (emptied) slot, replace with a single space so LibreOffice doesn't break
+            replacement = xml_enc(new_para) if new_para else ""
+            xml = xml.replace(CL_ORIG_PARAS[i], replacement)
 
     file_map["word/document.xml"] = xml.encode("utf-8")
     out = io.BytesIO()
