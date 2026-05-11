@@ -42,8 +42,8 @@ CL_DOCX_PATH = Path(__file__).parent / "cover_letter_template.docx"
 
 GEMINI_MODELS = [
     "gemini-2.5-flash",
-    "gemini-2.5-flash-lite",
-    "gemini-3.1-flash-lite-preview",
+    "gemini-2.0-flash",
+    "gemini-3-flash-preview",
 ]
 
 # ═══════════════════════════════════════════════════════════════════
@@ -251,6 +251,34 @@ ORIG = {
         "Supported cross-functional teams in debugging critical production issues.",
         "Received Professionalism Badge for collaboration and technical research contributions.",
     ],
+    # (English original → German translation) — applied when resume_lang == "de"
+    "SECTION_HEADERS_DE": [
+        ("PROFESSIONAL SUMMARY",       "BERUFLICHES PROFIL"),
+        ("TECHNICAL SKILLS",           "FACHLICHE KENNTNISSE"),
+        ("PROFESSIONAL EXPERIENCE",    "BERUFSERFAHRUNG"),
+        ("EDUCATION",                  "AUSBILDUNG"),
+        ("CERTIFICATIONS",             "ZERTIFIKATE"),
+        ("PROJECT EXPERIENCE",         "PROJEKTE"),
+        ("EXTRACURRICULAR",            "WEITERE AKTIVITÄTEN"),
+        ("Relevant Modules:",          "Relevante Module:"),
+        ("RWTH Aachen University – Business School, Germany",  "RWTH Aachen University – Business School, Deutschland"),
+        ("RV College of Engineering, Bangalore, India",        "RV College of Engineering, Bangalore, Indien"),
+        ("B.E. Electronics and Telecommunication Engineering", "B.Sc. Elektronik und Telekommunikation"),
+        ("Ashwa Racing – Formula Student Hybrid Vehicle Project",
+         "Ashwa Racing – Formula Student Hybrid-Fahrzeug Projekt"),
+        ("Designed Vehicle Control Unit (VCU) and Data Acquisition System (DAQ) for hybrid race vehicles.",
+         "Entwurf der Vehicle Control Unit (VCU) und des Data Acquisition Systems (DAQ) für Hybrid-Rennfahrzeuge."),
+        ("Implemented Texas Instruments CC1390 wireless MCU for real-time telemetry transmission.",
+         "Implementierung des Texas Instruments CC1390 wireless MCU für Echtzeit-Telemetrie."),
+        ("Managed Electrical & Testing subsystem, recruiting and training junior team members.",
+         "Leitung des Elektrik- und Test-Subsystems sowie Rekrutierung und Schulung junior Teammitglieder."),
+        ("Secured 1st Place – Formula Hybrid 2021 (USA) under IEEE & Formula Student.",
+         "1. Platz – Formula Hybrid 2021 (USA) unter IEEE & Formula Student."),
+        ("Innovation Team Member, Enactus Aachen e.V.",
+         "Mitglied im Innovationsteam, Enactus Aachen e.V."),
+        ("400+ hours of community service supporting education initiatives in remote regions.",
+         "Über 400 Stunden ehrenamtliche Bildungsarbeit in abgelegenen Regionen."),
+    ],
 }
 
 
@@ -263,15 +291,17 @@ class AnalyzeRequest(BaseModel):
 
 
 class TailorRequest(BaseModel):
-    jd:            str
-    track:         str   # fulltime_dev | werk_dev | werk_pm | fulltime_pm
-    custom_title:  str = ""
-    company:       str = ""
-    cover_letter:  bool = False
-    cl_lang:       str = "en"
-    fit_score:     int = 7
-    ats_keywords:  List[str] = []
-    projects:      List[str] = []
+    jd:                   str
+    track:                str
+    custom_title:         str = ""
+    company:              str = ""
+    resume_lang:          str = "en"   # en | de
+    cover_letter:         bool = False
+    cl_lang:              str = "en"
+    special_instructions: str = ""
+    fit_score:            int = 7
+    ats_keywords:         List[str] = []
+    projects:             List[str] = []
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -573,6 +603,32 @@ def build_tailor_prompt(req: TailorRequest) -> str:
 
     company_line = f"Company: {req.company}\n" if req.company else ""
 
+    lang_directive = ""
+    if req.resume_lang == "de":
+        lang_directive = (
+            "\n===== RESUME LANGUAGE: GERMAN =====\n"
+            "Write EVERYTHING in fluent professional German — summary, all skill values, every bullet.\n"
+            "Keep proper nouns in English (ServiceNow, Flexera, AWS, GraphQL, REST API, etc.).\n"
+            "Use natural German technical vocabulary (Datenbank, Schnittstelle, Architektur, Skalierbar, Effizient).\n"
+            "Do NOT translate certification names, tool names, or company names.\n"
+            "NEVER wrap any word in backticks or quotes — write fluent prose.\n"
+            "Section headers will be auto-translated separately — focus on content only.\n"
+        )
+    else:
+        lang_directive = (
+            "\n===== RESUME LANGUAGE: ENGLISH =====\n"
+            "Write in clean professional English. NEVER mix German words into English text. "
+            "NEVER wrap any word in backticks or quotes.\n"
+        )
+
+    special_block = ""
+    if req.special_instructions and req.special_instructions.strip():
+        special_block = (
+            "\n===== ADDITIONAL USER INSTRUCTIONS (HIGH PRIORITY) =====\n"
+            f"{req.special_instructions.strip()[:1500]}\n"
+            "Follow these unless they conflict with TRUTH ANCHOR or absolute rules.\n"
+        )
+
     return f"""You are an expert resume writer tailoring Vishal's resume.
 
 {TRUTH_ANCHOR}
@@ -585,7 +641,7 @@ Voice: {cfg['tone']}
 
 ===== JOB DESCRIPTION =====
 {req.jd[:3500]}
-
+{lang_directive}{special_block}
 ===== STRATEGY =====
 EMPHASIS: {cfg['emphasis']}
 
@@ -744,7 +800,7 @@ Kill List (NEVER mention these): {cfg['kill_list']}
 
 ===== JOB DESCRIPTION =====
 {req.jd[:2500]}
-
+{(chr(10) + "===== ADDITIONAL USER INSTRUCTIONS =====" + chr(10) + req.special_instructions.strip()[:1000] + chr(10)) if req.special_instructions and req.special_instructions.strip() else ""}
 ===== OPENING HOOK (adapt naturally to the JD specifics) =====
 {hook}
 
@@ -780,12 +836,63 @@ Kill List (NEVER mention these): {cfg['kill_list']}
 # ═══════════════════════════════════════════════════════════════════
 # DOCX PATCHING
 # ═══════════════════════════════════════════════════════════════════
-def patch_docx(ai: dict) -> bytes:
+
+# Permanent extra certification — Vector Database Fundamentals
+# Appended after the "Go: The Complete Developer's Guide" cert at runtime.
+EXTRA_CERT_PARA_XML = (
+    '<w:p w:rsidR="00000000" w:rsidDel="00000000" w:rsidP="00000000" '
+    'w:rsidRDefault="00000000" w:rsidRPr="00000000" w14:paraId="0000002B">'
+    '<w:pPr><w:keepNext w:val="0"/><w:keepLines w:val="0"/><w:pageBreakBefore w:val="0"/>'
+    '<w:widowControl w:val="1"/><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr>'
+    '<w:pBdr><w:top w:space="0" w:sz="0" w:val="nil"/><w:left w:space="0" w:sz="0" w:val="nil"/>'
+    '<w:bottom w:space="0" w:sz="0" w:val="nil"/><w:right w:space="0" w:sz="0" w:val="nil"/>'
+    '<w:between w:space="0" w:sz="0" w:val="nil"/></w:pBdr>'
+    '<w:shd w:fill="auto" w:val="clear"/>'
+    '<w:spacing w:after="30" w:before="30" w:line="240" w:lineRule="auto"/>'
+    '<w:ind w:left="480" w:right="0" w:hanging="240"/><w:jc w:val="left"/><w:rPr/></w:pPr>'
+    '<w:r w:rsidDel="00000000" w:rsidR="00000000" w:rsidRPr="00000000"><w:rPr>'
+    '<w:rFonts w:ascii="Arial" w:cs="Arial" w:eastAsia="Arial" w:hAnsi="Arial"/>'
+    '<w:b w:val="0"/><w:bCs w:val="0"/><w:i w:val="0"/><w:iCs w:val="0"/>'
+    '<w:smallCaps w:val="0"/><w:strike w:val="0"/><w:color w:val="555555"/>'
+    '<w:sz w:val="20"/><w:szCs w:val="20"/><w:u w:val="none"/>'
+    '<w:shd w:fill="auto" w:val="clear"/><w:vertAlign w:val="baseline"/><w:rtl w:val="0"/>'
+    '</w:rPr><w:t xml:space="preserve">'
+    'Vector Database Fundamentals (AI, LLMs, Embeddings, RAG, Vector Search, Semantic Search)'
+    '</w:t></w:r></w:p>'
+)
+
+
+def inject_extra_cert(xml: str) -> str:
+    """Insert the Vector DB cert paragraph after the 'Go:' cert paragraph."""
+    anchor = "Go: The Complete Developer's Guide"
+    idx = xml.find(anchor)
+    if idx == -1:
+        return xml  # nothing to anchor to
+    # End of the paragraph containing the anchor
+    p_end = xml.find("</w:p>", idx)
+    if p_end == -1:
+        return xml
+    p_end += len("</w:p>")
+    # Don't double-insert if already present
+    if "Vector Database Fundamentals" in xml:
+        return xml
+    return xml[:p_end] + EXTRA_CERT_PARA_XML + xml[p_end:]
+
+def patch_docx(ai: dict, resume_lang: str = "en") -> bytes:
     with zipfile.ZipFile(io.BytesIO(DOCX_PATH.read_bytes()), "r") as zin:
         names    = zin.namelist()
         file_map = {n: zin.read(n) for n in names}
 
     xml = file_map["word/document.xml"].decode("utf-8")
+
+    # Inject the Vector DB cert (always)
+    xml = inject_extra_cert(xml)
+
+    # Translate section headers + fixed German-applicable content
+    if resume_lang == "de":
+        for en, de in ORIG["SECTION_HEADERS_DE"]:
+            if en != de:
+                xml = xml_replace(xml, en, de)
 
     if ai.get("summary"):
         xml = replace_summary(xml, ai["summary"])
@@ -931,7 +1038,7 @@ async def tailor(req: TailorRequest):
             cl_pdf   = docx_to_pdf(cl_docx)
             cover_letter_pdf_b64 = base64.b64encode(cl_pdf).decode()
 
-    docx_bytes = patch_docx(ai)
+    docx_bytes = patch_docx(ai, resume_lang=req.resume_lang)
     pdf_bytes  = docx_to_pdf(docx_bytes)
 
     company_slug = re.sub(r"[^a-zA-Z0-9]", "_", req.company)[:30] if req.company else ""
