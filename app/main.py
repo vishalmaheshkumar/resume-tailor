@@ -22,6 +22,11 @@ from pathlib import Path
 from typing import Optional, List
 
 import httpx
+from pypdf import PdfReader, PdfWriter
+from pypdf.generic import (
+    DictionaryObject, NameObject, ArrayObject, NumberObject,
+    TextStringObject, FloatObject
+)
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response, JSONResponse
@@ -48,6 +53,14 @@ GEMINI_MODELS = [
     "gemini-2.0-flash",
     "gemini-3-flash-preview",
 ]
+
+# Text → URL mapping for clickable link injection in PDFs.
+# These exact strings appear in template_en.docx and template_de.docx.
+PDF_LINK_MAP = {
+    "LinkedIn Profile":       "https://www.linkedin.com/in/vishal-mahesh-kumar-a29049184/",
+    "Website":                "https://vishalmaheshkumar.github.io/",
+    "vishalm.rwth@gmail.com": "mailto:vishalm.rwth@gmail.com",
+}
 
 # ═══════════════════════════════════════════════════════════════════
 # TRUTH ANCHOR — Vishal's actual verified experience
@@ -904,6 +917,72 @@ def patch_cover_letter_docx(letter_text: str) -> bytes:
     return out.getvalue()
 
 
+def add_clickable_links(pdf_bytes: bytes, link_map: dict = None) -> bytes:
+    """
+    Post-process a PDF to inject clickable /Link annotations on text matches.
+    Necessary because some LibreOffice builds (incl. Railway's) don't export
+    hyperlinks as clickable annotations even with FilterData JSON.
+    Idempotent — strips existing /Link annotations first.
+    """
+    if link_map is None:
+        link_map = PDF_LINK_MAP
+    try:
+        reader = PdfReader(io.BytesIO(pdf_bytes))
+        writer = PdfWriter(clone_from=reader)
+
+        for page in writer.pages:
+            # Strip existing /Link annotations to avoid duplicates
+            if "/Annots" in page:
+                kept = ArrayObject()
+                for ref in page["/Annots"]:
+                    try:
+                        obj = ref.get_object() if hasattr(ref, "get_object") else ref
+                        if str(obj.get("/Subtype")) != "/Link":
+                            kept.append(ref)
+                    except Exception:
+                        kept.append(ref)
+                page[NameObject("/Annots")] = kept
+
+            # Inject fresh /Link annotations for each text→URL pair
+            for text, url in link_map.items():
+                matches = []
+                def visitor(t, cm, tm, fontDict, fontSize, _text=text):
+                    if _text and _text in t:
+                        x, y = tm[4], tm[5]
+                        w = len(_text) * fontSize * 0.55
+                        h = fontSize * 1.1
+                        matches.append((x, y - 2, x + w, y + h))
+                page.extract_text(visitor_text=visitor)
+
+                for (x1, y1, x2, y2) in matches:
+                    annot = DictionaryObject({
+                        NameObject("/Type"):    NameObject("/Annot"),
+                        NameObject("/Subtype"): NameObject("/Link"),
+                        NameObject("/Rect"): ArrayObject([
+                            FloatObject(x1), FloatObject(y1),
+                            FloatObject(x2), FloatObject(y2),
+                        ]),
+                        NameObject("/Border"): ArrayObject([NumberObject(0)] * 3),
+                        NameObject("/A"): DictionaryObject({
+                            NameObject("/Type"): NameObject("/Action"),
+                            NameObject("/S"):    NameObject("/URI"),
+                            NameObject("/URI"):  TextStringObject(url),
+                        }),
+                    })
+                    if "/Annots" in page:
+                        page["/Annots"].append(annot)
+                    else:
+                        page[NameObject("/Annots")] = ArrayObject([annot])
+
+        out = io.BytesIO()
+        writer.write(out)
+        return out.getvalue()
+    except Exception as e:
+        # If anything goes wrong, return original PDF (don't break the response)
+        print(f"[add_clickable_links] error: {e}")
+        return pdf_bytes
+
+
 def docx_to_pdf(docx_bytes: bytes) -> bytes:
     with tempfile.TemporaryDirectory() as tmpdir:
         docx_path = Path(tmpdir) / "resume.docx"
@@ -934,7 +1013,8 @@ def docx_to_pdf(docx_bytes: bytes) -> bytes:
         pdf_path = Path(tmpdir) / "resume.pdf"
         if not pdf_path.exists():
             raise HTTPException(500, "PDF not created.")
-        return pdf_path.read_bytes()
+        # Post-process to inject clickable link annotations
+        return add_clickable_links(pdf_path.read_bytes())
 
 
 # ═══════════════════════════════════════════════════════════════════
