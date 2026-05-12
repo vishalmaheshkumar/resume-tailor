@@ -37,7 +37,10 @@ app.add_middleware(
 )
 
 GEMINI_KEY = os.environ.get("GEMINI_KEY", "")
-DOCX_PATH    = Path(__file__).parent / "template.docx"
+DOCX_PATHS   = {
+    "en": Path(__file__).parent / "template_en.docx",
+    "de": Path(__file__).parent / "template_de.docx",
+}
 CL_DOCX_PATH = Path(__file__).parent / "cover_letter_template.docx"
 
 GEMINI_MODELS = [
@@ -250,34 +253,6 @@ ORIG = {
         "Created synchronous and asynchronous Business Rules to enforce data consistency during record insert/update.",
         "Supported cross-functional teams in debugging critical production issues.",
         "Received Professionalism Badge for collaboration and technical research contributions.",
-    ],
-    # (English original → German translation) — applied when resume_lang == "de"
-    "SECTION_HEADERS_DE": [
-        ("PROFESSIONAL SUMMARY",       "BERUFLICHES PROFIL"),
-        ("TECHNICAL SKILLS",           "FACHLICHE KENNTNISSE"),
-        ("PROFESSIONAL EXPERIENCE",    "BERUFSERFAHRUNG"),
-        ("EDUCATION",                  "AUSBILDUNG"),
-        ("CERTIFICATIONS",             "ZERTIFIKATE"),
-        ("PROJECT EXPERIENCE",         "PROJEKTE"),
-        ("EXTRACURRICULAR",            "WEITERE AKTIVITÄTEN"),
-        ("Relevant Modules:",          "Relevante Module:"),
-        ("RWTH Aachen University – Business School, Germany",  "RWTH Aachen University – Business School, Deutschland"),
-        ("RV College of Engineering, Bangalore, India",        "RV College of Engineering, Bangalore, Indien"),
-        ("B.E. Electronics and Telecommunication Engineering", "B.Sc. Elektronik und Telekommunikation"),
-        ("Ashwa Racing – Formula Student Hybrid Vehicle Project",
-         "Ashwa Racing – Formula Student Hybrid-Fahrzeug Projekt"),
-        ("Designed Vehicle Control Unit (VCU) and Data Acquisition System (DAQ) for hybrid race vehicles.",
-         "Entwurf der Vehicle Control Unit (VCU) und des Data Acquisition Systems (DAQ) für Hybrid-Rennfahrzeuge."),
-        ("Implemented Texas Instruments CC1390 wireless MCU for real-time telemetry transmission.",
-         "Implementierung des Texas Instruments CC1390 wireless MCU für Echtzeit-Telemetrie."),
-        ("Managed Electrical & Testing subsystem, recruiting and training junior team members.",
-         "Leitung des Elektrik- und Test-Subsystems sowie Rekrutierung und Schulung junior Teammitglieder."),
-        ("Secured 1st Place – Formula Hybrid 2021 (USA) under IEEE & Formula Student.",
-         "1. Platz – Formula Hybrid 2021 (USA) unter IEEE & Formula Student."),
-        ("Innovation Team Member, Enactus Aachen e.V.",
-         "Mitglied im Innovationsteam, Enactus Aachen e.V."),
-        ("400+ hours of community service supporting education initiatives in remote regions.",
-         "Über 400 Stunden ehrenamtliche Bildungsarbeit in abgelegenen Regionen."),
     ],
 }
 
@@ -837,62 +812,17 @@ Kill List (NEVER mention these): {cfg['kill_list']}
 # DOCX PATCHING
 # ═══════════════════════════════════════════════════════════════════
 
-# Permanent extra certification — Vector Database Fundamentals
-# Appended after the "Go: The Complete Developer's Guide" cert at runtime.
-EXTRA_CERT_PARA_XML = (
-    '<w:p w:rsidR="00000000" w:rsidDel="00000000" w:rsidP="00000000" '
-    'w:rsidRDefault="00000000" w:rsidRPr="00000000" w14:paraId="0000002B">'
-    '<w:pPr><w:keepNext w:val="0"/><w:keepLines w:val="0"/><w:pageBreakBefore w:val="0"/>'
-    '<w:widowControl w:val="1"/><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr>'
-    '<w:pBdr><w:top w:space="0" w:sz="0" w:val="nil"/><w:left w:space="0" w:sz="0" w:val="nil"/>'
-    '<w:bottom w:space="0" w:sz="0" w:val="nil"/><w:right w:space="0" w:sz="0" w:val="nil"/>'
-    '<w:between w:space="0" w:sz="0" w:val="nil"/></w:pBdr>'
-    '<w:shd w:fill="auto" w:val="clear"/>'
-    '<w:spacing w:after="30" w:before="30" w:line="240" w:lineRule="auto"/>'
-    '<w:ind w:left="480" w:right="0" w:hanging="240"/><w:jc w:val="left"/><w:rPr/></w:pPr>'
-    '<w:r w:rsidDel="00000000" w:rsidR="00000000" w:rsidRPr="00000000"><w:rPr>'
-    '<w:rFonts w:ascii="Arial" w:cs="Arial" w:eastAsia="Arial" w:hAnsi="Arial"/>'
-    '<w:b w:val="0"/><w:bCs w:val="0"/><w:i w:val="0"/><w:iCs w:val="0"/>'
-    '<w:smallCaps w:val="0"/><w:strike w:val="0"/><w:color w:val="555555"/>'
-    '<w:sz w:val="20"/><w:szCs w:val="20"/><w:u w:val="none"/>'
-    '<w:shd w:fill="auto" w:val="clear"/><w:vertAlign w:val="baseline"/><w:rtl w:val="0"/>'
-    '</w:rPr><w:t xml:space="preserve">'
-    'Vector Database Fundamentals (AI, LLMs, Embeddings, RAG, Vector Search, Semantic Search)'
-    '</w:t></w:r></w:p>'
-)
-
-
-def inject_extra_cert(xml: str) -> str:
-    """Insert the Vector DB cert paragraph after the 'Go:' cert paragraph."""
-    anchor = "Go: The Complete Developer's Guide"
-    idx = xml.find(anchor)
-    if idx == -1:
-        return xml  # nothing to anchor to
-    # End of the paragraph containing the anchor
-    p_end = xml.find("</w:p>", idx)
-    if p_end == -1:
-        return xml
-    p_end += len("</w:p>")
-    # Don't double-insert if already present
-    if "Vector Database Fundamentals" in xml:
-        return xml
-    return xml[:p_end] + EXTRA_CERT_PARA_XML + xml[p_end:]
-
 def patch_docx(ai: dict, resume_lang: str = "en") -> bytes:
-    with zipfile.ZipFile(io.BytesIO(DOCX_PATH.read_bytes()), "r") as zin:
+    # Pick template based on requested resume language
+    docx_path = DOCX_PATHS.get(resume_lang, DOCX_PATHS["en"])
+    if not docx_path.exists():
+        raise HTTPException(500, f"Template missing: {docx_path.name}")
+
+    with zipfile.ZipFile(io.BytesIO(docx_path.read_bytes()), "r") as zin:
         names    = zin.namelist()
         file_map = {n: zin.read(n) for n in names}
 
     xml = file_map["word/document.xml"].decode("utf-8")
-
-    # Inject the Vector DB cert (always)
-    xml = inject_extra_cert(xml)
-
-    # Translate section headers + fixed German-applicable content
-    if resume_lang == "de":
-        for en, de in ORIG["SECTION_HEADERS_DE"]:
-            if en != de:
-                xml = xml_replace(xml, en, de)
 
     if ai.get("summary"):
         xml = replace_summary(xml, ai["summary"])
@@ -1003,11 +933,13 @@ def docx_to_pdf(docx_bytes: bytes) -> bytes:
 def health():
     soffice = shutil.which("soffice") or shutil.which("libreoffice")
     return {
-        "status":      "ok",
-        "libreoffice": bool(soffice),
-        "gemini_key":  bool(GEMINI_KEY),
-        "template":    DOCX_PATH.exists(),
-        "version":     "v5-strategic",
+        "status":       "ok",
+        "libreoffice":  bool(soffice),
+        "gemini_key":   bool(GEMINI_KEY),
+        "template_en":  DOCX_PATHS["en"].exists(),
+        "template_de":  DOCX_PATHS["de"].exists(),
+        "cl_template":  CL_DOCX_PATH.exists(),
+        "version":      "v6-dual-template",
     }
 
 
@@ -1023,8 +955,9 @@ async def tailor(req: TailorRequest):
     """Stage 2: Generate tailored PDF + optional cover letter"""
     if not GEMINI_KEY:
         raise HTTPException(500, "GEMINI_KEY not set.")
-    if not DOCX_PATH.exists():
-        raise HTTPException(500, "template.docx missing.")
+    tmpl = DOCX_PATHS.get(req.resume_lang, DOCX_PATHS["en"])
+    if not tmpl.exists():
+        raise HTTPException(500, f"Template missing: {tmpl.name}")
 
     ai = await call_gemini(build_tailor_prompt(req), temp=0.15)
 
