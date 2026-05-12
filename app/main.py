@@ -42,16 +42,41 @@ app.add_middleware(
 )
 
 GEMINI_KEY = os.environ.get("GEMINI_KEY", "")
+
+# Strings users type as placeholders during testing — strip silently
+PLACEHOLDER_VALUES = {
+    "test", "test1", "test2", "test123", "test1234", "test12345",
+    "xxx", "xxxxx", "tbd", "n/a", "na", "asdf", "qwerty",
+    "abc", "123", "1234", "12345", "lorem", "ipsum",
+    "placeholder", "company", "role", "title", "x", "xx",
+    "company name", "job title", "role title",
+}
+
+def clean_placeholder(value: str) -> str:
+    """Return empty string if value looks like a placeholder, else the trimmed value."""
+    if not value:
+        return ""
+    v = value.strip()
+    if not v:
+        return ""
+    if v.lower() in PLACEHOLDER_VALUES:
+        return ""
+    # Also catch repeated chars (xxx, aaa, ----)
+    if len(set(v.lower())) <= 2 and len(v) <= 8:
+        return ""
+    return v
 DOCX_PATHS   = {
     "en": Path(__file__).parent / "template_en.docx",
     "de": Path(__file__).parent / "template_de.docx",
 }
 CL_DOCX_PATH = Path(__file__).parent / "cover_letter_template.docx"
 
+# Current Gemini models per https://ai.google.dev/gemini-api/docs/models (verified May 2026)
+# Waterfall — tries each in order; uses next on rate limit / overload / unavailable
 GEMINI_MODELS = [
-    "gemini-2.5-flash",
-    "gemini-2.0-flash",
-    "gemini-3-flash-preview",
+    "gemini-2.5-flash",          # primary — stable, well-tested
+    "gemini-3-flash-preview",    # current preview — Google's official example model
+    "gemini-2.5-flash-lite",     # cheapest fallback for high-load periods
 ]
 
 # Text → URL mapping for clickable link injection in PDFs.
@@ -61,6 +86,24 @@ PDF_LINK_MAP = {
     "Website":                "https://vishalmaheshkumar.github.io/",
     "vishalm.rwth@gmail.com": "mailto:vishalm.rwth@gmail.com",
 }
+
+# Cover letter has different sidebar text — different link map
+CL_PDF_LINK_MAP = {
+    "Click LinkedIn":              "https://www.linkedin.com/in/vishal-mahesh-kumar-a29049184/",
+    "vishalmaheshkumar.github.io": "https://vishalmaheshkumar.github.io/",
+    "vishalm.rwth@gmail.com":      "mailto:vishalm.rwth@gmail.com",
+}
+
+# Sidebar label translations applied when cl_lang == "de"
+CL_SIDEBAR_DE = [
+    ("Aachen, Germany",        "Aachen, Deutschland"),
+    ("RWTH AACHEN, Germany",   "RWTH AACHEN, Deutschland"),
+    ("Ph: ",                   "Tel: "),
+    ("Email: ",                "E-Mail: "),
+    ("Website : ",             "Webseite: "),
+    ("QR code for Website: ",  "QR-Code für Webseite: "),
+    ("QR code for LinkedIn: ", "QR-Code für LinkedIn: "),
+]
 
 # ═══════════════════════════════════════════════════════════════════
 # TRUTH ANCHOR — Vishal's actual verified experience
@@ -346,8 +389,27 @@ async def call_gemini(prompt: str, temp: float = 0.35, max_tokens: int = 6000) -
                 if r.status_code != 200:
                     msg = data.get("error", {}).get("message", f"HTTP {r.status_code}")
                     last_error = f"{model}: {msg}"
-                    if any(s in msg.lower() for s in ["high demand", "overload", "resource_exhausted"]) or r.status_code in (429, 503):
+                    msg_lower = msg.lower()
+
+                    # Overload / rate limit → try next model
+                    if r.status_code in (429, 503) or any(
+                        s in msg_lower for s in [
+                            "high demand", "overload", "resource_exhausted",
+                            "rate limit", "quota exceeded"
+                        ]
+                    ):
                         continue
+
+                    # Model dead / unavailable / deprecated → try next model
+                    if r.status_code in (400, 404) or any(
+                        s in msg_lower for s in [
+                            "no longer available", "not found", "is not supported",
+                            "deprecated", "has been shut down", "is not available"
+                        ]
+                    ):
+                        print(f"[gemini] {model} is unavailable, trying next…")
+                        continue
+
                     raise HTTPException(502, f"Gemini error: {msg}")
 
                 if "error" in data:
@@ -664,12 +726,14 @@ RULE 3 — SKILL CATEGORY INTEGRITY:
 - Example: "Product & Strategy" row must contain PM concepts, NOT code libraries
 - Before outputting, verify each label-value pairing makes sense
 
-RULE 4 — STRUCTURE:
-- Summary: exactly 4 sentences. No more, no less.
+RULE 4 — STRUCTURE + LENGTH (ONE-PAGE TARGET):
+- Summary: exactly 4 sentences, ~70-90 words total
 - skill_labels: EXACTLY the 6 provided below — DO NOT modify
 - skill_values: EXACTLY 6, each semantically matching its label
-- sde_bullets: EXACTLY 8
-- ase_bullets: EXACTLY 7
+- sde_bullets: EXACTLY 8. Each bullet ≤2 lines / ~25 words MAX.
+- ase_bullets: EXACTLY 7. Each bullet ≤1 line / ~15 words MAX.
+- TOTAL document target: ONE PAGE. If a bullet would wrap to 3 lines, REWRITE IT SHORTER.
+- Prefer punchy concrete bullets over verbose explanations. Cut filler words: "in order to" → "to", "demonstrating my ability to" → drop entirely.
 
 RULE 5 — CONTENT QUALITY:
 - Bullets start with strong verbs from the voice/tone specified
@@ -769,11 +833,20 @@ def build_cl_prompt(req: TailorRequest) -> str:
     )
 
     lang_inst = (
-        "Write in GERMAN (formal Sie form, no du)."
+        "Write 100% in GERMAN (formal Sie form, no 'du')."
         if is_de else
-        "Write in ENGLISH."
+        "Write 100% in ENGLISH."
     )
-    lang_note = "GERMAN throughout — formal Sie form. NEVER mix in English words or backticked terms." if is_de else "ENGLISH throughout. NEVER wrap German words in backticks or quotes."
+    lang_note = (
+        "GERMAN ONLY — every single sentence in fluent professional German. "
+        "Keep proper nouns in English (ServiceNow, Flexera, AWS, RWTH Aachen, etc.) "
+        "but write ALL connective text, verbs, adjectives, and sentences in German. "
+        "Forbidden: starting a paragraph with 'Having spent...', 'At Flexera...', 'My M.Sc...'. "
+        "Instead use: 'Mit fast drei Jahren...', 'Bei Flexera...', 'Mein Masterstudium...'. "
+        "NEVER use backticks or quote-wrap words."
+        if is_de else
+        "ENGLISH ONLY — every sentence in fluent English. NEVER include German words or phrases (no 'Sehr geehrte', no 'Mit freundlichen Grüßen'). NEVER wrap any word in backticks or quotes."
+    )
 
     return f"""Write a professional cover letter for Vishal Mahesh Kumar.
 
@@ -885,8 +958,9 @@ CL_ORIG_PARAS = [
     "Ich arbeite strukturiert, verantwortungsbewusst und eigenständig und bringe eine hohe Lernbereitschaft sowie ein ausgeprägtes Qualitätsbewusstsein mit. Gerne möchte ich mein Wissen aus dem Studium mit praktischer Erfahrung verbinden und aktiv zum Erfolg Ihres Unternehmens beitragen.",
 ]
 
-def patch_cover_letter_docx(letter_text: str) -> bytes:
-    """Replace first 4 body paragraphs with Gemini content; clear the 5th to keep single-page."""
+def patch_cover_letter_docx(letter_text: str, cl_lang: str = "de") -> bytes:
+    """Replace first 4 body paragraphs with Gemini content; clear the 5th to keep single-page.
+    Translate sidebar labels to German when cl_lang == "de"."""
     paras = [p.strip() for p in letter_text.split("\n\n") if p.strip()]
     # Drop greeting / sign-off lines if Gemini included them anyway
     paras = [p for p in paras if not p.lower().startswith(
@@ -908,6 +982,11 @@ def patch_cover_letter_docx(letter_text: str) -> bytes:
             # For the 5th (emptied) slot, replace with a single space so LibreOffice doesn't break
             replacement = xml_enc(new_para) if new_para else ""
             xml = xml.replace(CL_ORIG_PARAS[i], replacement)
+
+    # Translate sidebar labels for German cover letter
+    if cl_lang == "de":
+        for en_text, de_text in CL_SIDEBAR_DE:
+            xml = xml_replace(xml, en_text, de_text)
 
     file_map["word/document.xml"] = xml.encode("utf-8")
     out = io.BytesIO()
@@ -983,7 +1062,8 @@ def add_clickable_links(pdf_bytes: bytes, link_map: dict = None) -> bytes:
         return pdf_bytes
 
 
-def docx_to_pdf(docx_bytes: bytes) -> bytes:
+def docx_to_pdf(docx_bytes: bytes, link_map: dict = None) -> bytes:
+    """Convert DOCX to PDF and inject clickable links (resume by default, or custom map for CL)."""
     with tempfile.TemporaryDirectory() as tmpdir:
         docx_path = Path(tmpdir) / "resume.docx"
         docx_path.write_bytes(docx_bytes)
@@ -1014,7 +1094,7 @@ def docx_to_pdf(docx_bytes: bytes) -> bytes:
         if not pdf_path.exists():
             raise HTTPException(500, "PDF not created.")
         # Post-process to inject clickable link annotations
-        return add_clickable_links(pdf_path.read_bytes())
+        return add_clickable_links(pdf_path.read_bytes(), link_map=link_map)
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -1046,6 +1126,10 @@ async def tailor(req: TailorRequest):
     """Stage 2: Generate tailored PDF + optional cover letter"""
     if not GEMINI_KEY:
         raise HTTPException(500, "GEMINI_KEY not set.")
+
+    # Strip placeholder values silently
+    req.company      = clean_placeholder(req.company)
+    req.custom_title = clean_placeholder(req.custom_title)
     tmpl = DOCX_PATHS.get(req.resume_lang, DOCX_PATHS["en"])
     if not tmpl.exists():
         raise HTTPException(500, f"Template missing: {tmpl.name}")
@@ -1058,8 +1142,8 @@ async def tailor(req: TailorRequest):
         letter_text = cl_result.get("letter", "")
         if letter_text:
             # Patch the cover letter DOCX template and convert to PDF
-            cl_docx  = patch_cover_letter_docx(letter_text)
-            cl_pdf   = docx_to_pdf(cl_docx)
+            cl_docx = patch_cover_letter_docx(letter_text, cl_lang=req.cl_lang)
+            cl_pdf  = docx_to_pdf(cl_docx, link_map=CL_PDF_LINK_MAP)
             cover_letter_pdf_b64 = base64.b64encode(cl_pdf).decode()
 
     docx_bytes = patch_docx(ai, resume_lang=req.resume_lang)
