@@ -913,8 +913,19 @@ def docx_to_pdf(docx_bytes: bytes) -> bytes:
         if not soffice:
             raise HTTPException(500, "LibreOffice not installed.")
 
+        # Explicit FilterData ensures hyperlinks are exported as clickable Annotations
+        # in the PDF (not all LibreOffice builds default this to true)
+        pdf_filter = (
+            'pdf:writer_pdf_Export:'
+            '{"ExportLinks":{"type":"boolean","value":"true"},'
+            '"ExportBookmarks":{"type":"boolean","value":"true"},'
+            '"ExportNotes":{"type":"boolean","value":"false"},'
+            '"UseTaggedPDF":{"type":"boolean","value":"true"},'
+            '"SelectPdfVersion":{"type":"long","value":"15"}}'
+        )
         result = subprocess.run(
-            [soffice, "--headless", "--convert-to", "pdf", "--outdir", tmpdir, str(docx_path)],
+            [soffice, "--headless", "--convert-to", pdf_filter,
+             "--outdir", tmpdir, str(docx_path)],
             capture_output=True, timeout=60
         )
         if result.returncode != 0:
