@@ -259,6 +259,21 @@ P7. MCP Prototype (during Flexera)
     - Natural-language ServiceNow ops via OpenAI Model Context Protocol
     TAGS: AI, MCP, emerging tech, enterprise AI, ServiceNow
 
+P8. Wolflayer — AI Collaboration Platform (PERSONAL PROJECT, recent; LIVE at wolflayer.app)
+    - Solo-built and deployed; live and publicly accessible via Google sign-in
+    - Full-stack real-time platform: Next.js 16, React 19, TypeScript, Supabase (Postgres/Auth/Realtime)
+    - Role-based access control across multiple real-time channel types
+    - AI workspace on Google Gemini: branching conversation graph with lineage-scoped context
+    - Visual workflow-execution engine (node graph, topological scheduling)
+    - OAuth integrations (GitHub, Google); AES-256-GCM encryption for stored credentials
+    - Owned end-to-end: problem definition, scope, architecture, roadmap
+    TAGS: full-stack, AI, LLM, Next.js, React, Supabase, real-time, workflow automation, OAuth, product ownership, solo founder, self-initiated, live product
+    NOTE: Personal solo project — built by one person, NOT a company, NOT a team, no paying users.
+    Real and live (verifiable at wolflayer.app), so full-stack/Next.js/React/Supabase ARE
+    genuine here (unlike P4/P5). On dev tracks emphasize the engineering; on PM tracks emphasize
+    end-to-end product ownership. NEVER claim a team, revenue, user counts, or scale. Only the
+    verified capabilities above — do not invent features.
+
 ===== EXTRACURRICULAR =====
 - Innovation Team Member, Enactus Aachen e.V. (current)
 - 400+ hours community service supporting education in remote regions
@@ -496,6 +511,7 @@ Company: {company or "(not specified)"}
    P5=Job Scanner (React/automation)
    P6=BlastMap AI (CMDB/AI/impact analysis)
    P7=MCP Prototype (AI/emerging tech/ServiceNow AI)
+   P8=Wolflayer (live full-stack AI product / Next.js+React+Supabase / workflow automation / product ownership — pick for dev OR PM roles, esp. AI/full-stack/product)
 
 5. **fit_rationale** (1-2 sentences, honest).
 
@@ -645,6 +661,7 @@ def build_tailor_prompt(req: TailorRequest) -> str:
             "P5": "Job Scanner — React, multi-portal",
             "P6": "BlastMap AI — CMDB blast radius analyzer concept",
             "P7": "MCP Prototype — natural-language ServiceNow via OpenAI MCP",
+            "P8": "Wolflayer (wolflayer.app) — live solo-built AI collaboration platform; Next.js 16/React 19/TypeScript/Supabase, branching AI workspace on Gemini, visual workflow engine, OAuth + AES-256-GCM; owned end-to-end",
         }
         proj_section = (
             "\n===== PROJECTS TO EMPHASIZE =====\n"
@@ -705,11 +722,14 @@ RULE 1 — ZERO HALLUCINATION:
 - Only use tools/technologies/skills that appear EXPLICITLY in the TRUTH ANCHOR
 - Vishal has NEVER used PROFESSIONALLY: Shopify, HubSpot, Salesforce, SAP, LeanIX, Kubernetes,
   Docker production, Terraform, Azure, GCP, Google Cloud, Jenkins, Snowflake, Databricks, Tableau,
-  PowerBI, Figma, Adobe, any CRM, any marketing tool, any e-commerce/D2C platform, Next.js, Vue,
-  Angular, Node.js backend, TypeScript production, React Native, Flutter, mobile dev, Ansible,
+  PowerBI, Figma, Adobe, any CRM, any marketing tool, any e-commerce/D2C platform, Vue,
+  Angular, Node.js backend, React Native, Flutter, mobile dev, Ansible,
   Spring Boot, .NET, Ruby, PHP, Java production.
-- React: ONLY in personal projects context (if mentioned at all). Never in main skills section.
-  Never claim React experience. Even if JD asks for React heavily — skip it.
+- Next.js, React, TypeScript, Supabase: REAL but ONLY via the Wolflayer personal project (P8,
+  live at wolflayer.app). They are genuine and may be claimed WHEN P8/Wolflayer is being emphasized
+  (project bullets, or a project-driven summary clause). DO NOT put them in the main professional
+  TECHNICAL SKILLS section as if they were Flexera/enterprise experience, and never imply they were
+  used professionally at Flexera.
 - If the JD mentions a tool Vishal has never used: DO NOT include it anywhere.
 - Missing 1 keyword is ALWAYS better than fabricating 1 keyword. Interviews catch lies.
 
@@ -756,10 +776,12 @@ RULE 7 — VOICE / GRAMMATICAL PERSON:
 - RIGHT: "Designed APIs..." or "Led the redesign..."
 
 RULE 8 — REACT / FRAMEWORKS:
-- Vishal has NOT used React, Vue, Angular, or any frontend framework professionally
-- React was used ONLY in personal projects (AI Resume Tool, Job Scanner) — fine to mention there
-- DO NOT list React in the main TECHNICAL SKILLS section
-- DO NOT add React, Vue, Angular, frontend frameworks, or UI libraries to skill_values
+- Vishal has NOT used React, Vue, Angular, or any frontend framework at Flexera or in any job
+- React, Next.js, and TypeScript ARE real via the Wolflayer personal project (P8, live product)
+  and the smaller personal tools (AI Resume Tool, Job Scanner) — fine to claim in a PROJECT context
+- DO NOT list React/Next.js/Vue/Angular in the main professional TECHNICAL SKILLS section
+- DO NOT add them to skill_values as if they were enterprise/Flexera experience
+- It is fine for a Wolflayer project bullet to name Next.js, React, TypeScript, Supabase — that is true
 
 RULE 9 — SKILL CATEGORY ROW MEANING:
 - "Backend & Integration" → ServiceNow, REST APIs, GraphQL, server-side scripting, integrations
