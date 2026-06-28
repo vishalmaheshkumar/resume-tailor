@@ -65,9 +65,51 @@ def clean_placeholder(value: str) -> str:
     if len(set(v.lower())) <= 2 and len(v) <= 8:
         return ""
     return v
-DOCX_PATHS   = {
-    "en": Path(__file__).parent / "template_en.docx",
-    "de": Path(__file__).parent / "template_de.docx",
+# Per-track resume templates. Only the PROFESSIONAL SUMMARY paragraph (identified by its stable
+# w14:paraId) is rewritten by Gemini — skills, bullets, education, certs, and projects are final,
+# hand-authored content and stay untouched. EN/DE docs share identical paraIds (DE was translated
+# from the same source), so both slots use the same summary_para_id per track.
+TRACK_TEMPLATES = {
+    "fulltime_dev": {
+        "en": {
+            "path": Path(__file__).parent / "resume_fulltime_dev.docx",
+            "summary_para_id": "509E3F0B",
+        },
+        "de": {
+            "path": Path(__file__).parent / "resume_fulltime_dev_de.docx",
+            "summary_para_id": "509E3F0B",
+        },
+    },
+    "werk_dev": {
+        "en": {
+            "path": Path(__file__).parent / "resume_werk_dev.docx",
+            "summary_para_id": "6D2F69FE",
+        },
+        "de": {
+            "path": Path(__file__).parent / "resume_werk_dev_de.docx",
+            "summary_para_id": "6D2F69FE",
+        },
+    },
+    "fulltime_pm": {
+        "en": {
+            "path": Path(__file__).parent / "resume_fulltime_pm.docx",
+            "summary_para_id": "1E81F3C6",
+        },
+        "de": {
+            "path": Path(__file__).parent / "resume_fulltime_pm_de.docx",
+            "summary_para_id": "1E81F3C6",
+        },
+    },
+    "werk_pm": {
+        "en": {
+            "path": Path(__file__).parent / "resume_werk_pm.docx",
+            "summary_para_id": "59618F30",
+        },
+        "de": {
+            "path": Path(__file__).parent / "resume_werk_pm_de.docx",
+            "summary_para_id": "59618F30",
+        },
+    },
 }
 CL_DOCX_PATH = Path(__file__).parent / "cover_letter_template.docx"
 
@@ -267,12 +309,22 @@ P8. Wolflayer — AI Collaboration Platform (PERSONAL PROJECT, recent; LIVE at w
     - Visual workflow-execution engine (node graph, topological scheduling)
     - OAuth integrations (GitHub, Google); AES-256-GCM encryption for stored credentials
     - Owned end-to-end: problem definition, scope, architecture, roadmap
+    - Currently in user testing / active build stage under Collective Incubator (Aachen, Germany)
     TAGS: full-stack, AI, LLM, Next.js, React, Supabase, real-time, workflow automation, OAuth, product ownership, solo founder, self-initiated, live product
     NOTE: Personal solo project — built by one person, NOT a company, NOT a team, no paying users.
     Real and live (verifiable at wolflayer.app), so full-stack/Next.js/React/Supabase ARE
     genuine here (unlike P4/P5). On dev tracks emphasize the engineering; on PM tracks emphasize
     end-to-end product ownership. NEVER claim a team, revenue, user counts, or scale. Only the
     verified capabilities above — do not invent features.
+
+P9. TÜV SÜD — Capability-to-Account Mapping Assistant (RWTH Service Innovation Lab, consulting project)
+    - Led a 5-person student team advising TÜV SÜD's Key Account Management (KAM) organization
+      (~150 KAMs, ~20% of TÜV SÜD's customer base)
+    - Scoped 5 AI use cases across the account-management lifecycle
+    - Designed a 4-pillar enterprise architecture model (Data, Tech, Org, Governance) in draw.io
+    - Pitched a 9-month pilot roadmap to TÜV SÜD KAM leadership
+    TAGS: enterprise architecture, AI strategy, consulting, stakeholder management, team leadership,
+    account management, governance
 
 ===== EXTRACURRICULAR =====
 - Innovation Team Member, Enactus Aachen e.V. (current)
@@ -283,49 +335,6 @@ P8. Wolflayer — AI Collaboration Platform (PERSONAL PROJECT, recent; LIVE at w
 - Promoted at Flexera (Associate → SDE) after 7 months
 - Flexera Professionalism Badge
 """
-
-
-# ═══════════════════════════════════════════════════════════════════
-# DOCX ANCHORS (text-level replacement targets)
-# ═══════════════════════════════════════════════════════════════════
-ORIG = {
-    "SUMMARY_PARA_ID": 'w14:paraId="00000004"',
-    "SK_LABELS": [
-        "ServiceNow: ",
-        "ITAM / Enterprise Platforms: ",
-        "Backend &amp; Integration: ",
-        "AI &amp; Protocols: ",
-        "Cloud &amp; Databases: ",
-        "Tools: ",
-    ],
-    "SK_VALUES": [
-        "Scoped Applications, CMDB, Robust Transform Engine (RTE), Transform Maps, Business Rules (Sync/Async), Script Includes, Data Normalization",
-        "HAM, SAM, SaaS Manager, FlexeraOne, FNMS, IT Visibility",
-        "REST API Design, GraphQL, ServiceNow Server-Side JavaScript, Golang",
-        "OpenAI MCP (Model Context Protocol) Integration",
-        "AWS, MongoDB, PostgreSQL, S3, CloudWatch",
-        "JIRA, Confluence, Git, Agile Scrum",
-    ],
-    "SDE": [
-        "Migrated ETL functionalities from ServiceNow to AWS, redesigning platform architecture and improving customer-end performance by ~60%.",
-        "Designed and enhanced Robust Transform Engine (RTE) pipelines for enterprise hardware and software inventory ingestion.",
-        "Implemented mandatory field and lifecycle date-pair validation logic within RTE to filter invalid records prior to CMDB insertion.",
-        "Developed rule-based classification logic for Hardware Category, OS Category, and Subcategories for structured CMDB mapping.",
-        "Designed and implemented SMART REST APIs with pagination and structured response headers for large enterprise datasets.",
-        "Processed real-time network adapter events and mapped network interface data into CMDB.",
-        "Worked with GraphQL APIs for optimized data querying and reduced over-fetching compared to REST endpoints.",
-        "Built MCP-compatible backend services using OpenAI Model Context Protocol for AI-assisted enterprise workflows.",
-    ],
-    "ASE": [
-        "Worked on Flexera SaaS Manager platform for API integration and enterprise software inventory ingestion.",
-        "Assisted in development and maintenance of SaaS applications using MongoDB, PostgreSQL, and AWS.",
-        "Implemented dynamic mapping of devices into Computer and Network Gear tables using transformer logic.",
-        "Designed reusable Script Includes for validation, CMDB mapping, and API response formatting.",
-        "Created synchronous and asynchronous Business Rules to enforce data consistency during record insert/update.",
-        "Supported cross-functional teams in debugging critical production issues.",
-        "Received Professionalism Badge for collaboration and technical research contributions.",
-    ],
-}
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -361,24 +370,21 @@ def xml_replace(xml: str, old_plain: str, new_plain: str) -> str:
     return xml.replace(xml_enc(old_plain), xml_enc(new_plain))
 
 
-def replace_summary(xml: str, new_text: str) -> str:
-    anchor = ORIG["SUMMARY_PARA_ID"]
-    idx    = xml.find(anchor)
-    if idx == -1:
-        return xml
-    p_start = xml.rfind("<w:p ", 0, idx)
-    p_end   = xml.find("</w:p>", idx) + 6
-    new_para = (
-        '<w:p w:rsidR="00000000" w:rsidDel="00000000" w:rsidP="00000000" '
-        'w:rsidRDefault="00000000" w:rsidRPr="00000000" w14:paraId="00000004">'
-        '<w:pPr><w:spacing w:after="80" w:before="80" w:lineRule="auto"/>'
-        '<w:jc w:val="both"/><w:rPr/></w:pPr>'
-        '<w:r><w:rPr>'
-        '<w:rFonts w:ascii="Arial" w:cs="Arial" w:eastAsia="Arial" w:hAnsi="Arial"/>'
-        '<w:color w:val="555555"/><w:sz w:val="20"/><w:szCs w:val="20"/><w:rtl w:val="0"/>'
-        f'</w:rPr><w:t xml:space="preserve">{xml_enc(new_text)}</w:t></w:r></w:p>'
+def replace_paragraph_text(xml: str, para_id: str, new_text: str) -> str:
+    """Replace the visible text of the <w:p> identified by w14:paraId, preserving its
+    paragraph properties (<w:pPr>, e.g. spacing/justification) but collapsing all runs
+    (which real Word docs often split around <w:proofErr> spell-check markers) into one."""
+    pattern = re.compile(
+        r'(<w:p\b[^>]*w14:paraId="' + re.escape(para_id) + r'"[^>]*>)(.*?)(</w:p>)', re.S
     )
-    return xml[:p_start] + new_para + xml[p_end:]
+    m = pattern.search(xml)
+    if not m:
+        return xml
+    opening, body, closing = m.groups()
+    ppr_match = re.search(r"<w:pPr>.*?</w:pPr>", body, re.S)
+    ppr = ppr_match.group(0) if ppr_match else ""
+    new_run = f'<w:r><w:t xml:space="preserve">{xml_enc(new_text)}</w:t></w:r>'
+    return xml[:m.start()] + opening + ppr + new_run + closing + xml[m.end():]
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -512,6 +518,7 @@ Company: {company or "(not specified)"}
    P6=BlastMap AI (CMDB/AI/impact analysis)
    P7=MCP Prototype (AI/emerging tech/ServiceNow AI)
    P8=Wolflayer (live full-stack AI product / Next.js+React+Supabase / workflow automation / product ownership — pick for dev OR PM roles, esp. AI/full-stack/product)
+   P9=TÜV SÜD Capability-to-Account Mapping (enterprise architecture/AI strategy/consulting/team leadership — pick for PM/EA-leaning roles)
 
 5. **fit_rationale** (1-2 sentences, honest).
 
@@ -542,15 +549,14 @@ def track_config(track: str) -> dict:
                 "Do NOT mention: Formula Student details, individual RWTH module names, "
                 "MCP/OpenAI Protocol prominently (fine in skills), marketing."
             ),
-            "skill_labels": [
-                "ServiceNow: ",
-                "ITAM / Enterprise Platforms: ",
-                "Backend & Integration: ",
-                "AI & Protocols: ",
-                "Cloud & Databases: ",
-                "Tools & Certifications: ",
-            ],
-            "availability": "Eligible to transition M.Sc. studies to part-time upon full-time hire.",
+            "availability": (
+                "available for full-time engineering roles from September 2026, with option to "
+                "switch program to my course part-time."
+            ),
+            "availability_de": (
+                "verfügbar für Festanstellungen im Engineering ab September 2026 – bei Bedarf "
+                "Wechsel auf Teilzeitstudium möglich."
+            ),
         },
         "werk_dev": {
             "persona": "Master's student with real enterprise IT background, contributing alongside studies",
@@ -565,15 +571,14 @@ def track_config(track: str) -> dict:
                 "MCP/OpenAI Protocol, deep AWS internals, '70% architecture redesign' "
                 "(too senior-sounding for Werkstudent)."
             ),
-            "skill_labels": [
-                "ServiceNow & CMDB: ",
-                "APIs & Development: ",
-                "Cloud & Databases: ",
-                "Tools & Collaboration: ",
-                "Academic Focus: ",
-                "Certifications: ",
-            ],
-            "availability": "Available 20h/week during semester, full-time during semester breaks.",
+            "availability": (
+                "Seeking Werkstudent / intern engineering roles (~20 hrs/week during semester, "
+                "up to 40 hrs in semester break)."
+            ),
+            "availability_de": (
+                "Suche nach Werkstudenten- bzw. Praktikumsstellen im Engineering (ca. 20 "
+                "Std./Woche im Semester, bis zu 40 Std. in der vorlesungsfreien Zeit)."
+            ),
         },
         "werk_pm": {
             "persona": "Technical PM/EA candidate bridging platform delivery and strategic product thinking",
@@ -592,15 +597,14 @@ def track_config(track: str) -> dict:
                 "These signal 'developer' and undermine the PM/EA candidacy. "
                 "FlexeraOne/FNMS — mention sparingly as product context only, never as code."
             ),
-            "skill_labels": [
-                "Product & Strategy: ",
-                "Stakeholder & Delivery: ",
-                "Enterprise IT Platforms: ",
-                "Data & Analysis: ",
-                "Tools: ",
-                "Certifications: ",
-            ],
-            "availability": "Available 20h/week during semester, full-time during semester breaks.",
+            "availability": (
+                "Seeking PM Werkstudent / intern roles (~20 hrs/week during semester, up to 40 "
+                "hrs in semester break)."
+            ),
+            "availability_de": (
+                "Suche nach PM-Werkstudenten-/Praktikumsstellen (ca. 20 Std./Woche im Semester, "
+                "bis zu 40 Std. in der vorlesungsfreien Zeit)."
+            ),
         },
         "fulltime_pm": {
             "persona": "Technical Product Manager with 3yr enterprise SaaS experience + management master's",
@@ -614,15 +618,14 @@ def track_config(track: str) -> dict:
                 "Do NOT mention: deep code internals, RTE script-level work, "
                 "low-level Script Includes implementation details."
             ),
-            "skill_labels": [
-                "Product Management: ",
-                "Stakeholder & Customer: ",
-                "Technical Foundation: ",
-                "Platforms & Tools: ",
-                "Certifications: ",
-                "Domain Expertise: ",
-            ],
-            "availability": "Eligible to transition M.Sc. studies to part-time upon full-time hire.",
+            "availability": (
+                "Target: AI Solutions / Technical Product Manager roles where engineering depth "
+                "and stakeholder fluency both matter."
+            ),
+            "availability_de": (
+                "Ziel: AI-Solutions- / Technical-Product-Manager-Rollen, in denen technische "
+                "Tiefe und Stakeholder-Kommunikation gleichermaßen zählen."
+            ),
         },
     }
     return configs.get(track, configs["fulltime_dev"])
@@ -632,7 +635,11 @@ def track_config(track: str) -> dict:
 # STAGE 2 — TAILOR prompt
 # ═══════════════════════════════════════════════════════════════════
 def build_tailor_prompt(req: TailorRequest) -> str:
-    cfg  = track_config(req.track)
+    cfg = track_config(req.track)
+    closing_sentence = (
+        cfg.get("availability_de", cfg["availability"])
+        if req.resume_lang == "de" else cfg["availability"]
+    )
     role = req.custom_title or ({
         "fulltime_dev": "ServiceNow Developer",
         "werk_dev":     "Working Student — IT / Software",
@@ -662,9 +669,10 @@ def build_tailor_prompt(req: TailorRequest) -> str:
             "P6": "BlastMap AI — CMDB blast radius analyzer concept",
             "P7": "MCP Prototype — natural-language ServiceNow via OpenAI MCP",
             "P8": "Wolflayer (wolflayer.app) — live solo-built AI collaboration platform; Next.js 16/React 19/TypeScript/Supabase, branching AI workspace on Gemini, visual workflow engine, OAuth + AES-256-GCM; owned end-to-end",
+            "P9": "TÜV SÜD Capability-to-Account Mapping Assistant (RWTH Service Innovation Lab) — led 5-person team, 4-pillar enterprise architecture, 9-month pilot roadmap",
         }
         proj_section = (
-            "\n===== PROJECTS TO EMPHASIZE =====\n"
+            "\n===== PROJECTS TO EMPHASIZE (mention at most 1 briefly in the summary) =====\n"
             + "\n".join(f"  {p}: {proj_map.get(p,'')}" for p in req.projects) + "\n"
         )
 
@@ -674,12 +682,11 @@ def build_tailor_prompt(req: TailorRequest) -> str:
     if req.resume_lang == "de":
         lang_directive = (
             "\n===== RESUME LANGUAGE: GERMAN =====\n"
-            "Write EVERYTHING in fluent professional German — summary, all skill values, every bullet.\n"
+            "Write the summary in fluent professional German.\n"
             "Keep proper nouns in English (ServiceNow, Flexera, AWS, GraphQL, REST API, etc.).\n"
             "Use natural German technical vocabulary (Datenbank, Schnittstelle, Architektur, Skalierbar, Effizient).\n"
             "Do NOT translate certification names, tool names, or company names.\n"
             "NEVER wrap any word in backticks or quotes — write fluent prose.\n"
-            "Section headers will be auto-translated separately — focus on content only.\n"
         )
     else:
         lang_directive = (
@@ -696,7 +703,10 @@ def build_tailor_prompt(req: TailorRequest) -> str:
             "Follow these unless they conflict with TRUTH ANCHOR or absolute rules.\n"
         )
 
-    return f"""You are an expert resume writer tailoring Vishal's resume.
+    return f"""You are an expert resume writer. You are rewriting ONLY the PROFESSIONAL SUMMARY
+paragraph of Vishal's resume — every other section (skills, bullets, education, certifications,
+projects) is final, hand-authored content and is NOT being touched. Do not reference or assume
+you're rewriting anything else.
 
 {TRUTH_ANCHOR}
 
@@ -712,93 +722,48 @@ Voice: {cfg['tone']}
 ===== STRATEGY =====
 EMPHASIS: {cfg['emphasis']}
 
-KILL LIST: {cfg['kill_list']}
+KILL LIST (never mention these in the summary): {cfg['kill_list']}
 
-AVAILABILITY: {cfg['availability']}
+CLOSING SENTENCE (must end the summary with this, verbatim, no paraphrasing): {closing_sentence}
 {kw_section}{proj_section}
 ===== ABSOLUTE HARD RULES — VIOLATIONS = AUTO-REJECT =====
 
 RULE 1 — ZERO HALLUCINATION:
-- Only use tools/technologies/skills that appear EXPLICITLY in the TRUTH ANCHOR
+- Only use facts/tools/technologies that appear EXPLICITLY in the TRUTH ANCHOR
 - Vishal has NEVER used PROFESSIONALLY: Shopify, HubSpot, Salesforce, SAP, LeanIX, Kubernetes,
   Docker production, Terraform, Azure, GCP, Google Cloud, Jenkins, Snowflake, Databricks, Tableau,
   PowerBI, Figma, Adobe, any CRM, any marketing tool, any e-commerce/D2C platform, Vue,
   Angular, Node.js backend, React Native, Flutter, mobile dev, Ansible,
   Spring Boot, .NET, Ruby, PHP, Java production.
 - Next.js, React, TypeScript, Supabase: REAL but ONLY via the Wolflayer personal project (P8,
-  live at wolflayer.app). They are genuine and may be claimed WHEN P8/Wolflayer is being emphasized
-  (project bullets, or a project-driven summary clause). DO NOT put them in the main professional
-  TECHNICAL SKILLS section as if they were Flexera/enterprise experience, and never imply they were
-  used professionally at Flexera.
+  live at wolflayer.app) — never imply they were used professionally at Flexera.
 - If the JD mentions a tool Vishal has never used: DO NOT include it anywhere.
 - Missing 1 keyword is ALWAYS better than fabricating 1 keyword. Interviews catch lies.
 
 RULE 2 — NO BACKTICKS, NO GERMAN QUOTED WORDS:
 - NEVER wrap any word in backticks (`word`) or single-quotes in the output
 - Write English naturally; write German naturally — NEVER mix them with quotes/backticks
-- Backticks in resume text = instant AI-detection = auto-reject by recruiter
 - If the JD is in German but Vishal's resume is English, KEEP RESUME FULLY ENGLISH
-- Do NOT translate individual German words into the English resume
 
-RULE 3 — SKILL CATEGORY INTEGRITY:
-- Each skill_value MUST match its skill_label semantically
-- Example: "Cloud & Databases" row must contain cloud/database tools, NOT programming languages
-- Example: "Product & Strategy" row must contain PM concepts, NOT code libraries
-- Before outputting, verify each label-value pairing makes sense
+RULE 3 — STRUCTURE + LENGTH (ONE-PAGE TARGET):
+- Summary: 4-5 sentences, ~70-110 words total, ending with the CLOSING SENTENCE above
+- Prefer punchy concrete language over verbose explanations. Cut filler words: "in order to" → "to", "demonstrating my ability to" → drop entirely.
 
-RULE 4 — STRUCTURE + LENGTH (ONE-PAGE TARGET):
-- Summary: exactly 4 sentences, ~70-90 words total
-- skill_labels: EXACTLY the 6 provided below — DO NOT modify
-- skill_values: EXACTLY 6, each semantically matching its label
-- sde_bullets: EXACTLY 8. Each bullet ≤2 lines / ~25 words MAX.
-- ase_bullets: EXACTLY 7. Each bullet ≤1 line / ~15 words MAX.
-- TOTAL document target: ONE PAGE. If a bullet would wrap to 3 lines, REWRITE IT SHORTER.
-- Prefer punchy concrete bullets over verbose explanations. Cut filler words: "in order to" → "to", "demonstrating my ability to" → drop entirely.
-
-RULE 5 — CONTENT QUALITY:
-- Bullets start with strong verbs from the voice/tone specified
-- Most JD-relevant bullet first
+RULE 4 — CONTENT QUALITY:
+- Most JD-relevant fact first
 - No filler phrases ("leveraging", "results-driven", "passionate about")
 - Respect KILL LIST — those terms must not appear anywhere
 
-RULE 6 — SUMMARY ENDING:
-- Summary MUST end with the availability sentence exactly as given
-- Do not paraphrase the availability line
-
-RULE 7 — VOICE / GRAMMATICAL PERSON:
+RULE 5 — VOICE / GRAMMATICAL PERSON:
 - Resume summary is in IMPLICIT FIRST PERSON — no "I", no "Vishal", no "he/she", no name
 - WRONG: "Vishal is an M.Sc. candidate..." or "He has driven..."
 - WRONG: "I am an M.Sc. candidate..."
 - RIGHT: "M.Sc. candidate in Management & Engineering with 3+ years of enterprise SaaS experience..."
 - RIGHT: "Combines technical foundation with strategic product thinking..."
-- Bullets: ALWAYS start with action verb, NEVER with "I" or pronoun
-- WRONG: "I designed APIs..." or "He led the redesign..."
-- RIGHT: "Designed APIs..." or "Led the redesign..."
-
-RULE 8 — REACT / FRAMEWORKS:
-- Vishal has NOT used React, Vue, Angular, or any frontend framework at Flexera or in any job
-- React, Next.js, and TypeScript ARE real via the Wolflayer personal project (P8, live product)
-  and the smaller personal tools (AI Resume Tool, Job Scanner) — fine to claim in a PROJECT context
-- DO NOT list React/Next.js/Vue/Angular in the main professional TECHNICAL SKILLS section
-- DO NOT add them to skill_values as if they were enterprise/Flexera experience
-- It is fine for a Wolflayer project bullet to name Next.js, React, TypeScript, Supabase — that is true
-
-RULE 9 — SKILL CATEGORY ROW MEANING:
-- "Backend & Integration" → ServiceNow, REST APIs, GraphQL, server-side scripting, integrations
-- "AI & Protocols" → ONLY AI/ML/LLM specific items (OpenAI, MCP, Vector DBs, LLMs) — NOT data modeling
-- "Cloud & Databases" → AWS, MongoDB, PostgreSQL, S3, CloudWatch — NOT programming languages
-- "Tools & Certifications" → JIRA, Git, Confluence + cert names
-- "Product & Strategy" → Innovation, Strategic Mgmt, Roadmap, Stakeholder Mgmt — NOT code or APIs
-- "Stakeholder & Delivery" → Customer Engagement, Vendor Mgmt, Cross-functional Collab, Agile
-- If a skill doesn't fit any category cleanly, DROP IT instead of forcing it
 
 ===== OUTPUT — VALID JSON ONLY, NO MARKDOWN =====
 {{
-  "summary": "4-5 sentences tailored to this role.",
-  "skill_labels": {json.dumps(cfg['skill_labels'])},
-  "skill_values": ["v1","v2","v3","v4","v5","v6"],
-  "sde_bullets": ["b1","b2","b3","b4","b5","b6","b7","b8"],
-  "ase_bullets": ["b1","b2","b3","b4","b5","b6","b7"]
+  "summary": "4-5 sentences tailored to this role, ending with the CLOSING SENTENCE verbatim."
 }}"""
 
 
@@ -920,9 +885,16 @@ Kill List (NEVER mention these): {cfg['kill_list']}
 # DOCX PATCHING
 # ═══════════════════════════════════════════════════════════════════
 
-def patch_docx(ai: dict, resume_lang: str = "en") -> bytes:
-    # Pick template based on requested resume language
-    docx_path = DOCX_PATHS.get(resume_lang, DOCX_PATHS["en"])
+def patch_docx(track: str, resume_lang: str, ai: dict) -> bytes:
+    """Replace ONLY the PROFESSIONAL SUMMARY paragraph in the track's static template.
+    Skills, bullets, education, certs, and projects are final hand-authored content and
+    are never touched here."""
+    template = TRACK_TEMPLATES.get(track, {}).get(resume_lang)
+    if not template:
+        raise HTTPException(
+            400, f"No '{resume_lang}' resume template available yet for track '{track}'."
+        )
+    docx_path = template["path"]
     if not docx_path.exists():
         raise HTTPException(500, f"Template missing: {docx_path.name}")
 
@@ -933,27 +905,7 @@ def patch_docx(ai: dict, resume_lang: str = "en") -> bytes:
     xml = file_map["word/document.xml"].decode("utf-8")
 
     if ai.get("summary"):
-        xml = replace_summary(xml, ai["summary"])
-
-    if ai.get("skill_labels"):
-        for i, new_label in enumerate(ai["skill_labels"]):
-            if new_label and i < len(ORIG["SK_LABELS"]):
-                xml = xml.replace(xml_enc(ORIG["SK_LABELS"][i]), xml_enc(new_label))
-
-    if ai.get("skill_values"):
-        for i, new_val in enumerate(ai["skill_values"]):
-            if new_val and i < len(ORIG["SK_VALUES"]):
-                xml = xml_replace(xml, ORIG["SK_VALUES"][i], new_val)
-
-    if ai.get("sde_bullets"):
-        for i, bullet in enumerate(ai["sde_bullets"]):
-            if bullet and i < len(ORIG["SDE"]):
-                xml = xml_replace(xml, ORIG["SDE"][i], bullet)
-
-    if ai.get("ase_bullets"):
-        for i, bullet in enumerate(ai["ase_bullets"]):
-            if bullet and i < len(ORIG["ASE"]):
-                xml = xml_replace(xml, ORIG["ASE"][i], bullet)
+        xml = replace_paragraph_text(xml, template["summary_para_id"], ai["summary"])
 
     file_map["word/document.xml"] = xml.encode("utf-8")
 
@@ -1129,10 +1081,12 @@ def health():
         "status":       "ok",
         "libreoffice":  bool(soffice),
         "gemini_key":   bool(GEMINI_KEY),
-        "template_en":  DOCX_PATHS["en"].exists(),
-        "template_de":  DOCX_PATHS["de"].exists(),
+        "resume_templates": {
+            track: {lang: bool(slot and slot["path"].exists()) for lang, slot in langs.items()}
+            for track, langs in TRACK_TEMPLATES.items()
+        },
         "cl_template":  CL_DOCX_PATH.exists(),
-        "version":      "v6-dual-template",
+        "version":      "v7-per-track-summary-only",
     }
 
 
@@ -1152,9 +1106,13 @@ async def tailor(req: TailorRequest):
     # Strip placeholder values silently
     req.company      = clean_placeholder(req.company)
     req.custom_title = clean_placeholder(req.custom_title)
-    tmpl = DOCX_PATHS.get(req.resume_lang, DOCX_PATHS["en"])
-    if not tmpl.exists():
-        raise HTTPException(500, f"Template missing: {tmpl.name}")
+    template = TRACK_TEMPLATES.get(req.track, {}).get(req.resume_lang)
+    if not template:
+        raise HTTPException(
+            400, f"No '{req.resume_lang}' resume template available yet for track '{req.track}'."
+        )
+    if not template["path"].exists():
+        raise HTTPException(500, f"Template missing: {template['path'].name}")
 
     ai = await call_gemini(build_tailor_prompt(req), temp=0.15)
 
@@ -1168,7 +1126,7 @@ async def tailor(req: TailorRequest):
             cl_pdf  = docx_to_pdf(cl_docx, link_map=CL_PDF_LINK_MAP)
             cover_letter_pdf_b64 = base64.b64encode(cl_pdf).decode()
 
-    docx_bytes = patch_docx(ai, resume_lang=req.resume_lang)
+    docx_bytes = patch_docx(req.track, req.resume_lang, ai)
     pdf_bytes  = docx_to_pdf(docx_bytes)
 
     company_slug = re.sub(r"[^a-zA-Z0-9]", "_", req.company)[:30] if req.company else ""

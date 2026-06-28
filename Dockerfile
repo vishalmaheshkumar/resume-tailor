@@ -21,6 +21,8 @@ RUN apt-get update && \
 RUN mkdir -p /root/.config
 
 COPY app/main.py app/start.py ./
-COPY template_en.docx template_de.docx cover_letter_template.docx ./
+COPY resume_fulltime_dev.docx resume_werk_dev.docx resume_fulltime_pm.docx resume_werk_pm.docx \
+     resume_fulltime_dev_de.docx resume_werk_dev_de.docx resume_fulltime_pm_de.docx resume_werk_pm_de.docx \
+     cover_letter_template.docx ./
 
 CMD ["python", "start.py"]
