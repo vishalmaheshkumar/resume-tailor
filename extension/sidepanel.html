@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Resume Tailor</title>
+<link rel="stylesheet" href="sidepanel.css">
+</head>
+<body>
+  <div class="rt-header">
+    <div class="rt-header-left">
+      <span class="rt-logo">🎯</span>
+      <div>
+        <div class="rt-title">Resume Tailor</div>
+        <div class="rt-site" id="rt-site-label">Job Page</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="rt-body">
+
+    <button id="rt-extract" class="rt-btn-secondary">🔎 Re-extract from page</button>
+
+    <div id="rt-tasks-card" class="rt-card" style="display:none;">
+      <div class="rt-section-label">Auto-Prep Tasks</div>
+      <div style="font-size:11px;color:#8b87a8;margin-bottom:10px;line-height:1.5;">
+        Each job you Auto-Prep runs independently — launch another while this one is still going.
+      </div>
+      <div id="rt-tasks-list" style="display:flex;flex-direction:column;gap:8px;"></div>
+    </div>
+
+    <div class="rt-card">
+      <div class="rt-section-label">Application Autofill</div>
+      <div style="font-size:11px;color:#8b87a8;margin-bottom:10px;line-height:1.5;">
+        Fills the form on whatever page you're currently on (the application form, not the job
+        listing). Password fields are always skipped — fill those yourself.
+      </div>
+      <button id="rt-autofill-start" class="rt-btn-ghost">🤖 AI Autofill This Page</button>
+      <div id="rt-autofill-status" class="rt-status" style="margin-top:8px;"></div>
+    </div>
+
+    <div class="rt-card">
+      <div class="rt-section-label">Bulk Scan (LinkedIn search results)</div>
+      <div style="display:flex;gap:10px;margin-bottom:10px;">
+        <div class="rt-field" style="flex:1;">
+          <label>MAX PAGES</label>
+          <input id="rt-scan-pages" class="rt-input" type="number" min="1" max="10" value="3">
+        </div>
+        <div class="rt-field" style="flex:1;">
+          <label>MAX JOBS</label>
+          <input id="rt-scan-jobs" class="rt-input" type="number" min="1" max="150" value="30">
+        </div>
+      </div>
+      <div class="rt-toggle-row" style="margin-bottom:10px;">
+        <span style="font-size:11.5px;">🔗 Resolve external apply links while scanning <span style="color:#8b87a8;">(opens a tab per external job, auto-closes it after capturing the link)</span></span>
+        <label class="rt-switch">
+          <input type="checkbox" id="rt-scan-resolve">
+          <span class="rt-switch-track"></span>
+        </label>
+      </div>
+      <button id="rt-scan-start" class="rt-btn-secondary">📡 Start Bulk Scan</button>
+      <button id="rt-scan-launch" class="rt-btn-ghost" style="margin-top:8px;">🚀 Scan + Launch (auto Apply + auto-generate docs)</button>
+      <button id="rt-scan-stop" class="rt-btn-secondary" style="display:none;border-color:#ef4444;color:#fca5a5;">⏹ Stop Scan</button>
+      <div style="font-size:10.5px;color:#6e6a8a;margin-top:6px;line-height:1.4;">
+        "Scan + Launch" clicks each new job's Apply link as it's found (no manual Auto-Prep step) and starts generating its tailored resume immediately — same anti-flagging delays as a normal scan.
+      </div>
+      <div id="rt-scan-status" class="rt-status" style="margin-top:8px;"></div>
+      <div id="rt-scan-results" style="display:flex;flex-direction:column;gap:6px;margin-top:10px;max-height:280px;overflow-y:auto;"></div>
+      <div style="display:flex;gap:8px;margin-top:10px;">
+        <button id="rt-scan-export" class="rt-btn-secondary" style="flex:1;">📦 Export JSON</button>
+        <button id="rt-dashboard-open" class="rt-btn-secondary" style="flex:1;">📊 Dashboard</button>
+      </div>
+    </div>
+
+    <div id="rt-analysis" class="rt-card" style="display:none;"></div>
+
+    <div class="rt-card">
+      <div class="rt-section-label">Job Details</div>
+      <div class="rt-field" style="margin-bottom:10px;">
+        <label>COMPANY NAME</label>
+        <input id="rt-company" class="rt-input" type="text" placeholder="e.g. Siemens, SAP, Deutsche Bank…">
+      </div>
+      <div class="rt-field" style="margin-bottom:10px;">
+        <label>JOB TITLE <span style="font-weight:400;">(optional)</span></label>
+        <input id="rt-title" class="rt-input" type="text" placeholder="e.g. Technical Product Manager…">
+      </div>
+      <div class="rt-field">
+        <label>JOB DESCRIPTION</label>
+        <textarea id="rt-jd" class="rt-textarea rt-input" rows="6" placeholder="Paste the JD here, or use Re-extract above…"></textarea>
+      </div>
+    </div>
+
+    <button id="rt-analyze" class="rt-btn-ghost">🔍 Analyze JD</button>
+
+    <div class="rt-card">
+      <div class="rt-section-label">Controls</div>
+      <div class="rt-field" style="margin-bottom:10px;">
+        <label>TRACK</label>
+        <select id="rt-track" class="rt-select">
+          <option value="fulltime_dev">Full-Time — Developer / Engineer</option>
+          <option value="werk_dev">Werkstudent / Intern — Developer / IT</option>
+          <option value="werk_pm" selected>Werkstudent / Intern — PM / Strategy / EA</option>
+          <option value="fulltime_pm">Full-Time — Product Manager</option>
+        </select>
+      </div>
+      <div class="rt-field" style="margin-bottom:10px;">
+        <label>RESUME LANGUAGE</label>
+        <select id="rt-resume-lang" class="rt-select">
+          <option value="en">English</option>
+          <option value="de">Deutsch</option>
+        </select>
+      </div>
+      <div class="rt-field" style="margin-bottom:12px;">
+        <label>SPECIAL INSTRUCTIONS <span style="font-weight:400;">(optional)</span></label>
+        <textarea id="rt-special" class="rt-textarea rt-input" rows="3" placeholder="e.g. emphasize AI work, avoid mentioning Formula Student…"></textarea>
+      </div>
+      <div class="rt-toggle-row" style="margin-bottom:10px;">
+        <span style="font-size:12px;">📝 Cover letter</span>
+        <label class="rt-switch">
+          <input type="checkbox" id="rt-cl">
+          <span class="rt-switch-track"></span>
+        </label>
+      </div>
+      <div id="rt-lang-wrap" class="rt-field" style="display:none;">
+        <label>CL LANGUAGE</label>
+        <select id="rt-lang" class="rt-select">
+          <option value="en">English</option>
+          <option value="de">Deutsch</option>
+        </select>
+      </div>
+    </div>
+
+    <button id="rt-go" class="rt-btn-primary">✨ Generate Tailored Resume</button>
+    <button id="rt-edit-open" class="rt-btn-secondary" style="margin-top:2px;">✏️ Edit Resume Content</button>
+    <div id="rt-status" class="rt-status"></div>
+
+    <div class="rt-card">
+      <div class="rt-section-label">Coming Soon</div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <div class="rt-future-item">✉️ Cover Letter Preview <span class="rt-soon">Soon</span></div>
+        <div class="rt-future-item">💬 Recruiter Message <span class="rt-soon">Soon</span></div>
+        <div class="rt-future-item">🏢 Company Insights <span class="rt-soon">Soon</span></div>
+        <div class="rt-future-item">🎤 Interview Prep <span class="rt-soon">Soon</span></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Online resume editor — full-panel overlay so there's room to work with every line of the
+       resume, without leaving the extension or re-running JD analysis. -->
+  <div id="rt-editor" style="display:none;position:fixed;inset:0;background:#100f1a;z-index:50;flex-direction:column;">
+    <div class="rt-header">
+      <div class="rt-header-left">
+        <button id="rt-edit-back" style="background:none;border:none;color:#8b87a8;font-size:16px;cursor:pointer;padding:4px 8px;">← Back</button>
+        <div>
+          <div class="rt-title">Edit Resume</div>
+          <div class="rt-site" id="rt-edit-subtitle">—</div>
+        </div>
+      </div>
+    </div>
+    <div id="rt-edit-body" class="rt-body"></div>
+    <div style="padding:14px 20px;border-top:1px solid #232032;flex-shrink:0;display:flex;flex-direction:column;gap:8px;">
+      <div id="rt-edit-status" class="rt-status"></div>
+      <button id="rt-edit-save" class="rt-btn-primary">💾 Save &amp; Download PDF</button>
+    </div>
+  </div>
+
+  <script src="db.js"></script>
+  <script src="sidepanel.js"></script>
+</body>
+</html>

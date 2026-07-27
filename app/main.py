@@ -17,6 +17,7 @@ import base64
 import tempfile
 import subprocess
 import shutil
+import signal
 import zipfile
 from pathlib import Path
 from typing import Optional, List
@@ -39,6 +40,7 @@ app.add_middleware(
     allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["X-Cover-Letter-Pdf", "X-Summary-B64", "Content-Disposition"],
 )
 
 GEMINI_KEY = os.environ.get("GEMINI_KEY", "")
@@ -338,6 +340,134 @@ P9. TÜV SÜD — Capability-to-Account Mapping Assistant (RWTH Service Innovati
 
 
 # ═══════════════════════════════════════════════════════════════════
+# AUTOFILL PROFILE — personal/legal/contact details for application FORM FIELDS.
+# Separate from TRUTH_ANCHOR (which is the curated professional narrative used for resume
+# tailoring) since forms ask for things a resume never does: address, DOB, work-permit status,
+# salary expectations, etc. Deliberately contains NO credentials — password fields are always
+# skipped client-side; never put a real password in source code.
+# ═══════════════════════════════════════════════════════════════════
+AUTOFILL_PROFILE = """
+=== PERSONAL INFORMATION ===
+Full Name: Vishal Mahesh Kumar
+Salutation: Mr. / Herr
+First Name: Vishal
+Last Name: Mahesh Kumar
+Date of Birth: 14 Feb 2000
+Preferred Name: Vishal
+Email: vishalm.rwth@gmail.com
+Phone: +49 152 07480366
+  Country code: +49 (Germany)
+  Area code (without leading 0): 152
+  Number: 07480366
+Address: Franzstraße 107, 52064 Aachen, Nordrhein-Westfalen, Germany
+LinkedIn: https://www.linkedin.com/in/vishal-mahesh-kumar-a29049184/
+Website/Portfolio: https://vishalmaheshkumar.github.io/
+Nationality: Indian
+Gender: Male / Männlich
+Date of Birth Country: India
+
+=== LEGAL & WORK STATUS ===
+EU/EEA/Swiss/UK Citizen: No (I am an Indian citizen)
+German Work Permit: Yes — I hold a German student visa (Aufenthaltstitel) that permits Werkstudent employment up to 20 hours/week during semester, full-time during semester breaks
+Disability: No
+Available from: 01 July 2026 (format as needed: 01/07/2026 or 2026-07-01)
+Salary Expectation: Leave blank if asked for a number. If forced, ~15-18 EUR/hour for Werkstudent
+Currency: EUR
+Willingness to Travel: Yes / Up to 25%
+Former Employee at company being applied to: No (unless applying to Flexera)
+Employee Referral: No — unless I specifically mention one
+
+=== EDUCATION ===
+Current: M.Sc. Management & Engineering in Technology, Innovation, Marketing & Entrepreneurship (MME-TIME)
+University: RWTH Aachen University — Business School, Germany
+Duration: October 2025 – March 2027 (expected graduation)
+Status: Full-time student, can switch to part-time if offered full-time employment
+Relevant Modules: Data Analysis, Strategic Management, Innovation Management, Marketing Management, Leadership, Qualitative Research Methods
+
+Previous: B.E. Electronics and Telecommunication Engineering
+University: RV College of Engineering, Bangalore, India
+Duration: August 2018 – August 2022
+
+=== LANGUAGES ===
+English: C1 / Professional / Verhandlungssicher
+German: A1 / Beginner / Anfänger (actively learning)
+Hindi: Intermediate
+Kannada: Professional Level
+
+=== CERTIFICATIONS ===
+- ServiceNow Certified System Administrator (CSA) — Professional Exam
+- ServiceNow Certified Application Developer (CAD) — Professional Exam
+- Google Foundations of Project Management (Coursera)
+- Go: The Complete Developer's Guide (Udemy)
+- Vector Database Fundamentals — AI (Udemy)
+- Introduction to Embedded System Design (NPTEL)
+
+=== PROFESSIONAL EXPERIENCE (3+ years) ===
+
+Software Development Engineer (R&D) — Flexera Software (US-based enterprise SaaS company)
+Promoted | April 2023 – September 2025
+- Worked on "FlexeraOne" and "Flexera Integration" ServiceNow scoped applications
+- Redesigned product architecture (70% transformation), migrating ETL from ServiceNow to AWS
+- Developed SMART REST APIs reducing customer load, improving performance by 60%
+- Built prototypes with GraphQL, Model Context Protocol (MCP) using OpenAI API
+- Experience with ServiceNow CMDB, Data Normalization, Robust Transform Engine, Transform Maps
+- Trained technical support team, interacted with customers and service providers
+- Managed vendor relationships with Bristlecone and HCL
+- Built automated testing frameworks (ATF) for ServiceNow
+- Worked in global team with colleagues from US, Europe, and Australia
+
+Associate Software Engineer — Flexera Software
+September 2022 – April 2023
+- Worked on Flexera SaaS Manager — API research and integration
+- Developed with MongoDB, PostgreSQL, AWS S3, CloudWatch
+- Recognized with Professionalism Badge for research and collaboration
+- Supported cross-functional teams debugging critical issues
+
+Software Engineer Intern — Deevia Software India Pvt Ltd
+March 2022 – August 2022
+- Developed image processing software for oil rigs using Python, C++, OpenCV
+
+=== TECHNICAL SKILLS ===
+ServiceNow: Scoped Applications, CMDB, Robust Transform Engine (RTE), Transform Maps, Business Rules, Script Includes, Data Normalization, ITAM, HAM, SAM
+Backend & Integration: REST API Design, GraphQL, Server-Side JavaScript, Golang
+AI & Protocols: OpenAI MCP (Model Context Protocol)
+Cloud & Databases: AWS, MongoDB, PostgreSQL, S3, CloudWatch
+Tools: JIRA, Confluence, Git, Agile Scrum, Microsoft Office
+Product Management: Stakeholder Coordination, Customer Interactions, Agile Scrum
+
+=== KEY PROJECTS ===
+1. Wolflayer (wolflayer.app) — live solo-built AI collaboration platform on Next.js, React, Supabase
+2. AI Resume Tailoring Tool — personal tool with LLM APIs and word-level diffs
+3. Job Scanner Application — personal tool with live search across LinkedIn, Indeed, StepStone
+4. BlastMap AI — CMDB blast radius analyzer concept
+5. MCP Prototype — natural-language ServiceNow operations using OpenAI API
+6. TÜV SÜD Capability-to-Account Mapping Assistant — RWTH Service Innovation Lab consulting project
+
+=== ACHIEVEMENTS ===
+- Formula Hybrid 2021 (USA) — 1st Place in Hybrid Category (under IEEE & Formula Student)
+- Designed Vehicle Control Unit (VCU) and Data Acquisition System (DAQ) for hybrid race vehicles
+- Managed Electrical & Testing subsystem, recruited and trained junior team members
+- WIRIN Project at Indian Institute of Science (IISc) — Developed Distronic System for driverless car
+- Innovation Team Member, Enactus Aachen e.V.
+- 400+ hours of community service supporting education initiatives
+
+=== CAREER GOALS ===
+Seeking: Werkstudent or Internship roles in Product Management, Product Owner, or Technical PM
+Also open to: Full-time PM/engineering roles (can switch to part-time studies)
+Target profile: Technical Product Manager bridging engineering and business
+Strengths: Unique combination of 3 years enterprise SaaS development + management master's degree
+Differentiators: ServiceNow AI/MCP experience, dual certifications, Formula Student leadership, international team experience
+
+=== PERSONALITY & WORK STYLE ===
+- Collaborative team player with experience in cross-functional global teams
+- Strong problem-solver with both technical depth and business understanding
+- Proactive communicator who bridges technical and non-technical stakeholders
+- Passionate about technology-driven innovation and product thinking
+- Quick learner who adapts to new technologies and environments
+"""
+
+
+# ═══════════════════════════════════════════════════════════════════
 # REQUEST SCHEMAS
 # ═══════════════════════════════════════════════════════════════════
 class AnalyzeRequest(BaseModel):
@@ -359,6 +489,14 @@ class TailorRequest(BaseModel):
     projects:             List[str] = []
 
 
+class AutofillRequest(BaseModel):
+    page_context: str = ""
+    # Field shape varies a lot (selects have options, checkboxes have checked, etc.) — kept as
+    # loose dicts rather than a strict schema; this is passthrough data for the prompt, not used
+    # for any business logic here.
+    fields: List[dict] = []
+
+
 # ═══════════════════════════════════════════════════════════════════
 # XML HELPERS
 # ═══════════════════════════════════════════════════════════════════
@@ -366,8 +504,21 @@ def xml_enc(s: str) -> str:
     return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
 
 
+def xml_dec(s: str) -> str:
+    return (s.replace("&lt;", "<").replace("&gt;", ">")
+             .replace("&quot;", '"').replace("&apos;", "'").replace("&amp;", "&"))
+
+
 def xml_replace(xml: str, old_plain: str, new_plain: str) -> str:
     return xml.replace(xml_enc(old_plain), xml_enc(new_plain))
+
+
+def find_paragraph(xml: str, para_id: str):
+    """Return the re.Match for the <w:p> identified by w14:paraId, or None."""
+    pattern = re.compile(
+        r'<w:p\b[^>]*w14:paraId="' + re.escape(para_id) + r'"[^>]*>.*?</w:p>', re.S
+    )
+    return pattern.search(xml)
 
 
 def replace_paragraph_text(xml: str, para_id: str, new_text: str) -> str:
@@ -385,6 +536,140 @@ def replace_paragraph_text(xml: str, para_id: str, new_text: str) -> str:
     ppr = ppr_match.group(0) if ppr_match else ""
     new_run = f'<w:r><w:t xml:space="preserve">{xml_enc(new_text)}</w:t></w:r>'
     return xml[:m.start()] + opening + ppr + new_run + closing + xml[m.end():]
+
+
+def assert_only_paragraph_changed(old_xml: str, new_xml: str, para_id: str) -> None:
+    """Defense-in-depth for the AI resume tailoring path: the AI is only ever supposed to
+    rewrite the PROFESSIONAL SUMMARY paragraph. Verify the patched document.xml differs from
+    the original ONLY inside that paragraph's span — everything else (skills, bullets,
+    education, certs, projects) must be byte-for-byte identical. Fails loudly instead of
+    silently shipping a resume where something else got touched."""
+    old_m, new_m = find_paragraph(old_xml, para_id), find_paragraph(new_xml, para_id)
+    if not old_m or not new_m:
+        raise HTTPException(500, "Resume patch integrity check failed: summary paragraph not found.")
+    if old_xml[:old_m.start()] != new_xml[:new_m.start()] or old_xml[old_m.end():] != new_xml[new_m.end():]:
+        raise HTTPException(
+            500, "Resume patch integrity check failed: content outside the summary paragraph changed."
+        )
+
+
+# ═══════════════════════════════════════════════════════════════════
+# EDITABLE RESUME SECTIONS — run-level parsing for the online editor
+#
+# The resume templates are hand-formatted in Word: bold role titles, italic date ranges, bold
+# skill-category labels, etc., all living as separate <w:r> runs inside the same <w:p>. A naive
+# "replace the whole paragraph with one plain run" (fine for the AI summary, which is one
+# uniformly-formatted paragraph) would flatten all of that formatting away. Instead, runs are
+# grouped into "segments" — consecutive text-bearing runs that share the same bold/italic
+# formatting — and edits are written back into the first run of a segment (blanking the rest of
+# that segment's runs), leaving every run's <w:rPr> and every structural element (tabs, bullet
+# numbering, proofErr markers) exactly where it was.
+# ═══════════════════════════════════════════════════════════════════
+PARA_RE = re.compile(r'<w:p\b[^>]*w14:paraId="([0-9A-Fa-f]+)"[^>]*>.*?</w:p>', re.S)
+RUN_RE  = re.compile(r'<w:r\b[^>]*>.*?</w:r>', re.S)
+
+
+def _parse_runs(para_xml: str) -> list:
+    runs = []
+    for m in RUN_RE.finditer(para_xml):
+        run_xml = m.group(0)
+        rpr_m = re.search(r"<w:rPr>.*?</w:rPr>", run_xml, re.S)
+        rpr = rpr_m.group(0) if rpr_m else ""
+        t_m = re.search(r"<w:t\b[^>]*>(.*?)</w:t>", run_xml, re.S)
+        runs.append({
+            "start": m.start(), "end": m.end(), "run_xml": run_xml,
+            "has_text": t_m is not None,
+            "text": xml_dec(t_m.group(1)) if t_m else "",
+            "bold": "<w:b/>" in rpr or "<w:b " in rpr,
+            "italic": "<w:i/>" in rpr or "<w:i " in rpr,
+        })
+    return runs
+
+
+def _group_runs(runs: list) -> list:
+    """Group consecutive text-bearing runs sharing identical (bold, italic) into segments.
+    Each group holds the indices (into `runs`) of its member runs, in order."""
+    groups = []
+    for i, r in enumerate(runs):
+        if not r["has_text"]:
+            continue
+        if groups and groups[-1]["bold"] == r["bold"] and groups[-1]["italic"] == r["italic"]:
+            groups[-1]["run_indices"].append(i)
+            groups[-1]["text"] += r["text"]
+        else:
+            groups.append({"run_indices": [i], "text": r["text"], "bold": r["bold"], "italic": r["italic"]})
+    return groups
+
+
+def extract_editable_sections(xml: str, summary_para_id: str = None) -> list:
+    sections = []
+    for m in PARA_RE.finditer(xml):
+        para_id = m.group(1)
+        groups = _group_runs(_parse_runs(m.group(0)))
+        if not groups:
+            continue
+        sections.append({
+            "para_id": para_id,
+            "is_summary": para_id == summary_para_id,
+            "segments": [
+                {"id": f"{para_id}:{gi}", "text": g["text"], "bold": g["bold"], "italic": g["italic"]}
+                for gi, g in enumerate(groups)
+            ],
+        })
+    return sections
+
+
+def _set_run_text(run_xml: str, new_text_escaped: str) -> str:
+    return re.sub(
+        r"<w:t\b[^>]*>.*?</w:t>",
+        f'<w:t xml:space="preserve">{new_text_escaped}</w:t>',
+        run_xml, count=1, flags=re.S,
+    )
+
+
+def _apply_paragraph_edits(para_xml: str, group_edits: dict) -> str:
+    """group_edits: {group_index: new_text} for this one paragraph."""
+    runs = _parse_runs(para_xml)
+    groups = _group_runs(runs)
+
+    splices = []  # (start, end, new_run_xml), applied back-to-front
+    for gi, new_text in group_edits.items():
+        if gi < 0 or gi >= len(groups):
+            continue
+        for pos, ri in enumerate(groups[gi]["run_indices"]):
+            run = runs[ri]
+            text = xml_enc(new_text) if pos == 0 else ""
+            splices.append((run["start"], run["end"], _set_run_text(run["run_xml"], text)))
+
+    splices.sort(key=lambda s: s[0], reverse=True)
+    out = para_xml
+    for start, end, new_run_xml in splices:
+        out = out[:start] + new_run_xml + out[end:]
+    return out
+
+
+def apply_editable_sections(xml: str, edits: dict) -> str:
+    """edits: {"<paraId>:<groupIndex>": "new text", ...}"""
+    by_para: dict = {}
+    for seg_id, text in edits.items():
+        if ":" not in seg_id:
+            continue
+        para_id, gi = seg_id.rsplit(":", 1)
+        try:
+            gi = int(gi)
+        except ValueError:
+            continue
+        by_para.setdefault(para_id, {})[gi] = text
+
+    out = xml
+    for para_id, group_edits in by_para.items():
+        pattern = re.compile(r'<w:p\b[^>]*w14:paraId="' + re.escape(para_id) + r'"[^>]*>.*?</w:p>', re.S)
+        m = pattern.search(out)
+        if not m:
+            continue
+        new_para = _apply_paragraph_edits(m.group(0), group_edits)
+        out = out[:m.start()] + new_para + out[m.end():]
+    return out
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -439,9 +724,15 @@ async def call_gemini(prompt: str, temp: float = 0.35, max_tokens: int = 6000) -
 
                 text = data["candidates"][0]["content"]["parts"][0]["text"]
                 text = re.sub(r"^```(?:json)?\s*", "", text).strip().rstrip("` \n")
-                s, e = text.find("{"), text.rfind("}")
-                if s >= 0 and e > s:
-                    text = text[s:e+1]
+                # Most prompts ask for a top-level object; /autofill asks for a top-level array —
+                # slice out whichever bracket pair appears first (object vs array), not just "{...}".
+                brace, bracket = text.find("{"), text.find("[")
+                if brace == -1 and bracket == -1:
+                    pass
+                elif brace == -1 or (bracket != -1 and bracket < brace):
+                    text = text[bracket:text.rfind("]") + 1]
+                else:
+                    text = text[brace:text.rfind("}") + 1]
                 return json.loads(text)
 
             except HTTPException:
@@ -520,13 +811,20 @@ Company: {company or "(not specified)"}
    P8=Wolflayer (live full-stack AI product / Next.js+React+Supabase / workflow automation / product ownership — pick for dev OR PM roles, esp. AI/full-stack/product)
    P9=TÜV SÜD Capability-to-Account Mapping (enterprise architecture/AI strategy/consulting/team leadership — pick for PM/EA-leaning roles)
 
-5. **fit_rationale** (1-2 sentences, honest).
+5. **missing_keywords** (0-6 keywords, max 3 words each):
+   Tools/skills the JD explicitly asks for that Vishal genuinely does NOT have per the TRUTH ANCHOR
+   (e.g. the JD wants Kubernetes, SAP, Salesforce, etc. and Vishal has never used them). This is an
+   honest gap list for the candidate's own awareness — NOT used in the resume. Empty array if no
+   meaningful gaps. Do not list a keyword here if it's also in ats_keywords.
+
+6. **fit_rationale** (1-2 sentences, honest).
 
 OUTPUT VALID JSON ONLY, NO MARKDOWN:
 {{
   "track_suggestion": "werk_pm",
   "fit_score": 8,
   "ats_keywords": ["keyword1", "keyword2", "..."],
+  "missing_keywords": ["keyword3", "..."],
   "projects": ["P6", "P7"],
   "fit_rationale": "Strong fit because..."
 }}"""
@@ -882,6 +1180,57 @@ Kill List (NEVER mention these): {cfg['kill_list']}
 
 
 # ═══════════════════════════════════════════════════════════════════
+# AUTOFILL prompt — application form field mapping
+# ═══════════════════════════════════════════════════════════════════
+def build_autofill_prompt(fields: list, page_context: str) -> str:
+    return f"""You are an expert job application assistant helping Vishal fill out a job application form.
+
+{AUTOFILL_PROFILE}
+
+===== JOB PAGE CONTEXT =====
+{page_context[:2000]}
+
+===== FORM FIELDS FOUND =====
+{json.dumps(fields)}
+
+===== YOUR TASK =====
+Fill every field with the best possible value. Follow these rules:
+
+STANDARD FIELDS:
+- For SELECT dropdowns: return the EXACT "v" (value attribute) from the options. Match carefully.
+- For phone country code: pick GERMANY (+49). Do NOT pick Dominican Republic or any country that
+  just contains "49" in a longer code string. Look for "Germany" in the option text.
+- For date type="date": use YYYY-MM-DD format.
+- For date with placeholder dd/mm/yyyy: use that format.
+- "Former employee" = "No" (Vishal never worked at this company unless it's Flexera).
+- "Employee referral" = "No".
+- "EU/EEA citizen" = "No" (Indian citizen).
+- Disability = "No" or "I do not wish to answer".
+- NEVER fill a password-type field — always skip it, regardless of what else is on the page.
+
+OPEN-ENDED / DESCRIPTION FIELDS (textareas, motivation, cover letter, "about you", "why interested"):
+- Write compelling, professional, personalized responses.
+- Reference the SPECIFIC job title and company from the page context.
+- Highlight relevant experience from Vishal's profile that matches the job.
+- Keep it concise but impactful — 3-5 sentences for short fields, 1-2 paragraphs for longer ones.
+- Write in the SAME LANGUAGE as the form (German form = German answers, English form = English answers).
+- For "about yourself" / "profile summary": emphasize the unique combination of 3 years enterprise
+  software experience at a US SaaS company + RWTH management master's.
+- For "why this company/role": connect Vishal's experience to what the company does.
+- For "strengths" or "what do you bring": highlight technical depth + business understanding +
+  international team experience.
+- Do NOT be generic. Be specific about Vishal's actual projects and achievements.
+- ONLY use facts present in the profile above — never invent skills, tools, or experience not
+  listed there.
+
+SKIP: file upload fields, password fields, fields you truly cannot determine.
+
+RESPOND WITH ONLY A JSON ARRAY. No markdown, no backticks, no explanation.
+Format: [{{"index":0,"value":"the value to fill"}}]
+Include every field you can fill."""
+
+
+# ═══════════════════════════════════════════════════════════════════
 # DOCX PATCHING
 # ═══════════════════════════════════════════════════════════════════
 
@@ -905,7 +1254,9 @@ def patch_docx(track: str, resume_lang: str, ai: dict) -> bytes:
     xml = file_map["word/document.xml"].decode("utf-8")
 
     if ai.get("summary"):
-        xml = replace_paragraph_text(xml, template["summary_para_id"], ai["summary"])
+        new_xml = replace_paragraph_text(xml, template["summary_para_id"], ai["summary"])
+        assert_only_paragraph_changed(xml, new_xml, template["summary_para_id"])
+        xml = new_xml
 
     file_map["word/document.xml"] = xml.encode("utf-8")
 
@@ -1046,6 +1397,15 @@ def docx_to_pdf(docx_bytes: bytes, link_map: dict = None) -> bytes:
         if not soffice:
             raise HTTPException(500, "LibreOffice not installed.")
 
+        # Best-effort: reap any soffice.bin left behind by a prior request that timed out or
+        # crashed. Without this, orphaned processes pile up across requests, and LibreOffice
+        # (which shares the single /root/.config profile by default) eventually fails to spawn
+        # threads for new conversions ("osl::Thread::create failed") once the container's
+        # process/thread budget is exhausted — even though the binary is still present and
+        # /health still reports it as installed. Fine for this single-user backend's low
+        # concurrency; a busier deployment would want a proper process pool instead.
+        subprocess.run(["pkill", "-9", "-f", "soffice.bin"], capture_output=True)
+
         # Explicit FilterData ensures hyperlinks are exported as clickable Annotations
         # in the PDF (not all LibreOffice builds default this to true)
         pdf_filter = (
@@ -1056,13 +1416,28 @@ def docx_to_pdf(docx_bytes: bytes, link_map: dict = None) -> bytes:
             '"UseTaggedPDF":{"type":"boolean","value":"true"},'
             '"SelectPdfVersion":{"type":"long","value":"15"}}'
         )
-        result = subprocess.run(
-            [soffice, "--headless", "--convert-to", pdf_filter,
-             "--outdir", tmpdir, str(docx_path)],
-            capture_output=True, timeout=60
-        )
-        if result.returncode != 0:
-            raise HTTPException(500, f"LibreOffice failed: {result.stderr.decode()}")
+        # Isolated, throwaway profile per conversion (deleted along with tmpdir) instead of the
+        # shared /root/.config default — avoids profile-lock contention with any other soffice
+        # instance still shutting down, which is what causes the stalls/orphans above.
+        profile_dir = Path(tmpdir) / "loprofile"
+        cmd = [
+            soffice, "--headless", "--norestore",
+            f"-env:UserInstallation=file://{profile_dir}",
+            "--convert-to", pdf_filter, "--outdir", tmpdir, str(docx_path),
+        ]
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                 start_new_session=True)
+        try:
+            stdout, stderr = proc.communicate(timeout=60)
+        except subprocess.TimeoutExpired:
+            # Kill the whole process group, not just the direct child — soffice forks soffice.bin,
+            # and killing only the wrapper is exactly how orphans accumulate in the first place.
+            os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+            proc.wait()
+            raise HTTPException(500, "LibreOffice timed out during PDF conversion.")
+
+        if proc.returncode != 0:
+            raise HTTPException(500, f"LibreOffice failed: {stderr.decode(errors='replace')}")
 
         pdf_path = Path(tmpdir) / "resume.pdf"
         if not pdf_path.exists():
@@ -1094,6 +1469,20 @@ def health():
 async def analyze(req: AnalyzeRequest):
     """Stage 1: Analyze JD — returns track suggestion, fit score, ATS keywords, project picks"""
     result = await call_gemini(build_analyze_prompt(req.jd, req.company), temp=0.2, max_tokens=1500)
+    return JSONResponse(content=result)
+
+
+@app.post("/autofill")
+async def autofill(req: AutofillRequest):
+    """Map application form fields to values from AUTOFILL_PROFILE. Returns a JSON array of
+    {index, value} — the API key never ships to any client; this is the only place it's used."""
+    if not req.fields:
+        raise HTTPException(400, "No fields provided.")
+    result = await call_gemini(
+        build_autofill_prompt(req.fields, req.page_context), temp=0.3, max_tokens=8192
+    )
+    if not isinstance(result, list):
+        raise HTTPException(502, "Unexpected response shape from Gemini (expected a JSON array).")
     return JSONResponse(content=result)
 
 
@@ -1143,8 +1532,72 @@ async def tailor(req: TailorRequest):
         f"Vishal_Resume_{role_slug}.pdf"
     )
 
-    headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
+    headers = {
+        "Content-Disposition": f'attachment; filename="{filename}"',
+        # Lets the client seed the online editor with what was ACTUALLY generated, instead of
+        # falling back to the static template's placeholder summary text.
+        "X-Summary-B64": base64.b64encode((ai.get("summary") or "").encode("utf-8")).decode(),
+    }
     if cover_letter_pdf_b64:
         headers["X-Cover-Letter-Pdf"] = cover_letter_pdf_b64
 
+    return Response(content=pdf_bytes, media_type="application/pdf", headers=headers)
+
+
+# ═══════════════════════════════════════════════════════════════════
+# ONLINE RESUME EDITOR — no Gemini call, no relaunch. Reads/writes the same static .docx
+# templates as /tailor, but lets the client edit ANY text segment (not just the summary) and
+# get back a freshly-converted PDF in one round trip.
+# ═══════════════════════════════════════════════════════════════════
+class ResumeSaveRequest(BaseModel):
+    track:       str
+    resume_lang: str = "en"
+    edits:       dict = {}   # {"<paraId>:<segmentIndex>": "new text"}
+
+
+@app.get("/resume-sections")
+def resume_sections(track: str, resume_lang: str = "en"):
+    """Returns every editable text segment in the track's resume, in document order, grouped
+    by paragraph and tagged with bold/italic so a client can render a faithful editor."""
+    template = TRACK_TEMPLATES.get(track, {}).get(resume_lang)
+    if not template:
+        raise HTTPException(400, f"No '{resume_lang}' resume template available yet for track '{track}'.")
+    if not template["path"].exists():
+        raise HTTPException(500, f"Template missing: {template['path'].name}")
+
+    with zipfile.ZipFile(io.BytesIO(template["path"].read_bytes()), "r") as zin:
+        xml = zin.read("word/document.xml").decode("utf-8")
+
+    sections = extract_editable_sections(xml, template["summary_para_id"])
+    return JSONResponse(content={"sections": sections})
+
+
+@app.post("/resume-save")
+def resume_save(req: ResumeSaveRequest):
+    """Applies a set of segment edits directly (no AI involved) and returns the updated PDF."""
+    template = TRACK_TEMPLATES.get(req.track, {}).get(req.resume_lang)
+    if not template:
+        raise HTTPException(
+            400, f"No '{req.resume_lang}' resume template available yet for track '{req.track}'."
+        )
+    if not template["path"].exists():
+        raise HTTPException(500, f"Template missing: {template['path'].name}")
+
+    with zipfile.ZipFile(io.BytesIO(template["path"].read_bytes()), "r") as zin:
+        names    = zin.namelist()
+        file_map = {n: zin.read(n) for n in names}
+
+    xml = file_map["word/document.xml"].decode("utf-8")
+    if req.edits:
+        xml = apply_editable_sections(xml, req.edits)
+    file_map["word/document.xml"] = xml.encode("utf-8")
+
+    out = io.BytesIO()
+    with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as zout:
+        for n in names:
+            zout.writestr(n, file_map[n])
+
+    pdf_bytes = docx_to_pdf(out.getvalue())
+    filename  = f"Vishal_Resume_{req.track}_edited.pdf"
+    headers   = {"Content-Disposition": f'attachment; filename="{filename}"'}
     return Response(content=pdf_bytes, media_type="application/pdf", headers=headers)
