@@ -1,0 +1,75 @@
+/* Full-page extension document — no host page to isolate against, normal CSS. */
+* { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif; }
+
+html, body {
+  margin: 0; padding: 0;
+  background: #0d0c14; color: #c9c7e0;
+  font-size: 13px; line-height: 1.45;
+}
+
+.dash-header {
+  display: flex; align-items: baseline; justify-content: space-between;
+  padding: 20px 28px; border-bottom: 1px solid #232032;
+}
+.dash-title { font-size: 18px; font-weight: 700; color: #c4b5fd; }
+.dash-counts { font-size: 12px; color: #8b87a8; }
+.dash-counts strong { color: #e5e3f5; }
+
+.dash-toolbar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 14px 28px; border-bottom: 1px solid #232032;
+}
+.dash-input, .dash-select {
+  padding: 8px 12px; border-radius: 8px; background: #1a1825;
+  border: 1px solid #2d2b3e; color: #e5e3f5; font-size: 12.5px; outline: none;
+}
+.dash-input { flex: 1; min-width: 200px; }
+
+.dash-pill-group { display: flex; gap: 6px; }
+.dash-pill {
+  padding: 7px 13px; border-radius: 20px; border: 1px solid #2d2b3e; background: #1a1825;
+  color: #8b87a8; font-size: 12px; font-weight: 600; cursor: pointer;
+}
+.dash-pill.active { background: #4f46e5; color: #fff; border-color: #4f46e5; }
+
+.dash-btn-secondary {
+  padding: 8px 14px; border-radius: 8px; border: 1px dashed #4f46e5;
+  background: #1a1830; color: #c4b5fd; font-weight: 700; font-size: 12px; cursor: pointer;
+}
+
+.dash-table { width: 100%; border-collapse: collapse; }
+.dash-table th {
+  text-align: left; font-size: 10.5px; font-weight: 700; color: #8b87a8; letter-spacing: .6px;
+  text-transform: uppercase; padding: 12px 28px; border-bottom: 1px solid #232032;
+}
+.dash-table td {
+  padding: 12px 28px; border-bottom: 1px solid #1a1825; font-size: 12.5px; vertical-align: top;
+}
+.dash-table tr:hover td { background: #14121e; }
+
+.dash-cell-title { color: #e5e3f5; font-weight: 600; max-width: 260px; }
+.dash-cell-sub { color: #8b87a8; font-size: 11px; margin-top: 2px; }
+.dash-link { color: #c4b5fd; text-decoration: none; }
+.dash-link:hover { text-decoration: underline; }
+
+.dash-badge { display: inline-block; padding: 3px 9px; border-radius: 5px; font-size: 10.5px; font-weight: 600; }
+.dash-badge-easy_apply { background: #1f2d2a; color: #5eead4; }
+.dash-badge-external   { background: #241f3a; color: #d8b4fe; }
+.dash-badge-unknown     { background: #2d2b3e; color: #8b87a8; }
+
+.dash-status-select {
+  padding: 5px 8px; border-radius: 6px; border: 1px solid #2d2b3e; background: #1e1c2b;
+  color: #e5e3f5; font-size: 11.5px; outline: none;
+}
+.dash-status-select.s-new      { border-color: #3a3750; }
+.dash-status-select.s-ready    { border-color: #f59e0b; color: #fbbf24; }
+.dash-status-select.s-applied  { border-color: #10b981; color: #5eead4; }
+.dash-status-select.s-skipped  { border-color: #6e6a8a; color: #8b87a8; }
+
+.dash-open-btn {
+  padding: 6px 12px; border-radius: 6px; border: 1px solid #3a3750; background: #1e1c2b;
+  color: #c4b5fd; font-size: 11.5px; cursor: pointer; white-space: nowrap;
+}
+.dash-open-btn:hover { border-color: #4f46e5; }
+
+.dash-empty { padding: 60px 28px; text-align: center; color: #6e6a8a; font-size: 13px; }

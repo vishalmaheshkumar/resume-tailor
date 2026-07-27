@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Resume Tailor — Job Dashboard</title>
+<link rel="stylesheet" href="dashboard.css">
+</head>
+<body>
+  <header class="dash-header">
+    <div class="dash-title">🎯 Resume Tailor — Job Dashboard</div>
+    <div id="dash-counts" class="dash-counts"></div>
+  </header>
+
+  <div class="dash-toolbar">
+    <input id="dash-search" type="text" class="dash-input" placeholder="Search title or company…">
+
+    <div id="dash-status-filter" class="dash-pill-group">
+      <button class="dash-pill active" data-status="">All</button>
+      <button class="dash-pill" data-status="new">New</button>
+      <button class="dash-pill" data-status="ready">Ready</button>
+      <button class="dash-pill" data-status="applied">Applied</button>
+      <button class="dash-pill" data-status="skipped">Skipped</button>
+    </div>
+
+    <select id="dash-site-filter" class="dash-select">
+      <option value="">All sites</option>
+    </select>
+
+    <button id="dash-export" class="dash-btn-secondary">📦 Export JSON</button>
+    <button id="dash-refresh" class="dash-btn-secondary">🔄 Refresh</button>
+  </div>
+
+  <table class="dash-table">
+    <thead>
+      <tr>
+        <th>Title</th>
+        <th>Company</th>
+        <th>Location</th>
+        <th>Site</th>
+        <th>Apply</th>
+        <th>Apply URL</th>
+        <th>Status</th>
+        <th>Scraped</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody id="dash-rows"></tbody>
+  </table>
+
+  <div id="dash-empty" class="dash-empty" style="display:none;">
+    No jobs in the store yet — run a scan or single-job extraction from the side panel first.
+  </div>
+
+  <script src="db.js"></script>
+  <script src="dashboard.js"></script>
+</body>
+</html>
