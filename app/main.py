@@ -115,12 +115,16 @@ TRACK_TEMPLATES = {
 }
 CL_DOCX_PATH = Path(__file__).parent / "cover_letter_template.docx"
 
-# Current Gemini models per https://ai.google.dev/gemini-api/docs/models (verified May 2026)
-# Waterfall — tries each in order; uses next on rate limit / overload / unavailable
+# Current Gemini models per https://ai.google.dev/gemini-api/docs/models (verified Jul 2026)
+# Waterfall — tries each in order; uses next on rate limit / overload / unavailable.
+# NOTE: "gemini-2.5-flash-lite" was retired ("no longer available to new users") — do not
+# re-add the bare alias, it will always 400. gemini-2.5-pro kept last as a guaranteed-real
+# safety net in case the newer aliases below get renamed again.
 GEMINI_MODELS = [
     "gemini-2.5-flash",          # primary — stable, well-tested
     "gemini-3-flash-preview",    # current preview — Google's official example model
-    "gemini-2.5-flash-lite",     # cheapest fallback for high-load periods
+    "gemini-3.5-flash-lite",     # cheap fallback for high-load periods
+    "gemini-2.5-pro",            # last-resort safety net — slower/pricier but long-lived
 ]
 
 # Text → URL mapping for clickable link injection in PDFs.
