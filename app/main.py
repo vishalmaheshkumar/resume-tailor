@@ -28,7 +28,7 @@ from pypdf.generic import (
     DictionaryObject, NameObject, ArrayObject, NumberObject,
     TextStringObject, FloatObject
 )
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Form, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response, JSONResponse
 from pydantic import BaseModel
@@ -40,7 +40,7 @@ app.add_middleware(
     allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["X-Cover-Letter-Pdf", "X-Summary-B64", "Content-Disposition"],
+    expose_headers=["X-Cover-Letter-Pdf", "Content-Disposition"],
 )
 
 GEMINI_KEY = os.environ.get("GEMINI_KEY", "")
@@ -504,11 +504,6 @@ def xml_enc(s: str) -> str:
     return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
 
 
-def xml_dec(s: str) -> str:
-    return (s.replace("&lt;", "<").replace("&gt;", ">")
-             .replace("&quot;", '"').replace("&apos;", "'").replace("&amp;", "&"))
-
-
 def xml_replace(xml: str, old_plain: str, new_plain: str) -> str:
     return xml.replace(xml_enc(old_plain), xml_enc(new_plain))
 
@@ -551,125 +546,6 @@ def assert_only_paragraph_changed(old_xml: str, new_xml: str, para_id: str) -> N
         raise HTTPException(
             500, "Resume patch integrity check failed: content outside the summary paragraph changed."
         )
-
-
-# ═══════════════════════════════════════════════════════════════════
-# EDITABLE RESUME SECTIONS — run-level parsing for the online editor
-#
-# The resume templates are hand-formatted in Word: bold role titles, italic date ranges, bold
-# skill-category labels, etc., all living as separate <w:r> runs inside the same <w:p>. A naive
-# "replace the whole paragraph with one plain run" (fine for the AI summary, which is one
-# uniformly-formatted paragraph) would flatten all of that formatting away. Instead, runs are
-# grouped into "segments" — consecutive text-bearing runs that share the same bold/italic
-# formatting — and edits are written back into the first run of a segment (blanking the rest of
-# that segment's runs), leaving every run's <w:rPr> and every structural element (tabs, bullet
-# numbering, proofErr markers) exactly where it was.
-# ═══════════════════════════════════════════════════════════════════
-PARA_RE = re.compile(r'<w:p\b[^>]*w14:paraId="([0-9A-Fa-f]+)"[^>]*>.*?</w:p>', re.S)
-RUN_RE  = re.compile(r'<w:r\b[^>]*>.*?</w:r>', re.S)
-
-
-def _parse_runs(para_xml: str) -> list:
-    runs = []
-    for m in RUN_RE.finditer(para_xml):
-        run_xml = m.group(0)
-        rpr_m = re.search(r"<w:rPr>.*?</w:rPr>", run_xml, re.S)
-        rpr = rpr_m.group(0) if rpr_m else ""
-        t_m = re.search(r"<w:t\b[^>]*>(.*?)</w:t>", run_xml, re.S)
-        runs.append({
-            "start": m.start(), "end": m.end(), "run_xml": run_xml,
-            "has_text": t_m is not None,
-            "text": xml_dec(t_m.group(1)) if t_m else "",
-            "bold": "<w:b/>" in rpr or "<w:b " in rpr,
-            "italic": "<w:i/>" in rpr or "<w:i " in rpr,
-        })
-    return runs
-
-
-def _group_runs(runs: list) -> list:
-    """Group consecutive text-bearing runs sharing identical (bold, italic) into segments.
-    Each group holds the indices (into `runs`) of its member runs, in order."""
-    groups = []
-    for i, r in enumerate(runs):
-        if not r["has_text"]:
-            continue
-        if groups and groups[-1]["bold"] == r["bold"] and groups[-1]["italic"] == r["italic"]:
-            groups[-1]["run_indices"].append(i)
-            groups[-1]["text"] += r["text"]
-        else:
-            groups.append({"run_indices": [i], "text": r["text"], "bold": r["bold"], "italic": r["italic"]})
-    return groups
-
-
-def extract_editable_sections(xml: str, summary_para_id: str = None) -> list:
-    sections = []
-    for m in PARA_RE.finditer(xml):
-        para_id = m.group(1)
-        groups = _group_runs(_parse_runs(m.group(0)))
-        if not groups:
-            continue
-        sections.append({
-            "para_id": para_id,
-            "is_summary": para_id == summary_para_id,
-            "segments": [
-                {"id": f"{para_id}:{gi}", "text": g["text"], "bold": g["bold"], "italic": g["italic"]}
-                for gi, g in enumerate(groups)
-            ],
-        })
-    return sections
-
-
-def _set_run_text(run_xml: str, new_text_escaped: str) -> str:
-    return re.sub(
-        r"<w:t\b[^>]*>.*?</w:t>",
-        f'<w:t xml:space="preserve">{new_text_escaped}</w:t>',
-        run_xml, count=1, flags=re.S,
-    )
-
-
-def _apply_paragraph_edits(para_xml: str, group_edits: dict) -> str:
-    """group_edits: {group_index: new_text} for this one paragraph."""
-    runs = _parse_runs(para_xml)
-    groups = _group_runs(runs)
-
-    splices = []  # (start, end, new_run_xml), applied back-to-front
-    for gi, new_text in group_edits.items():
-        if gi < 0 or gi >= len(groups):
-            continue
-        for pos, ri in enumerate(groups[gi]["run_indices"]):
-            run = runs[ri]
-            text = xml_enc(new_text) if pos == 0 else ""
-            splices.append((run["start"], run["end"], _set_run_text(run["run_xml"], text)))
-
-    splices.sort(key=lambda s: s[0], reverse=True)
-    out = para_xml
-    for start, end, new_run_xml in splices:
-        out = out[:start] + new_run_xml + out[end:]
-    return out
-
-
-def apply_editable_sections(xml: str, edits: dict) -> str:
-    """edits: {"<paraId>:<groupIndex>": "new text", ...}"""
-    by_para: dict = {}
-    for seg_id, text in edits.items():
-        if ":" not in seg_id:
-            continue
-        para_id, gi = seg_id.rsplit(":", 1)
-        try:
-            gi = int(gi)
-        except ValueError:
-            continue
-        by_para.setdefault(para_id, {})[gi] = text
-
-    out = xml
-    for para_id, group_edits in by_para.items():
-        pattern = re.compile(r'<w:p\b[^>]*w14:paraId="' + re.escape(para_id) + r'"[^>]*>.*?</w:p>', re.S)
-        m = pattern.search(out)
-        if not m:
-            continue
-        new_para = _apply_paragraph_edits(m.group(0), group_edits)
-        out = out[:m.start()] + new_para + out[m.end():]
-    return out
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -1532,12 +1408,7 @@ async def tailor(req: TailorRequest):
         f"Vishal_Resume_{role_slug}.pdf"
     )
 
-    headers = {
-        "Content-Disposition": f'attachment; filename="{filename}"',
-        # Lets the client seed the online editor with what was ACTUALLY generated, instead of
-        # falling back to the static template's placeholder summary text.
-        "X-Summary-B64": base64.b64encode((ai.get("summary") or "").encode("utf-8")).decode(),
-    }
+    headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
     if cover_letter_pdf_b64:
         headers["X-Cover-Letter-Pdf"] = cover_letter_pdf_b64
 
@@ -1545,59 +1416,57 @@ async def tailor(req: TailorRequest):
 
 
 # ═══════════════════════════════════════════════════════════════════
-# ONLINE RESUME EDITOR — no Gemini call, no relaunch. Reads/writes the same static .docx
-# templates as /tailor, but lets the client edit ANY text segment (not just the summary) and
-# get back a freshly-converted PDF in one round trip.
+# ONLINE RESUME EDITOR — download the actual .docx, edit it in Word / Google Docs / Pages (full
+# formatting freedom, not constrained to any parsed representation), upload it back. The upload
+# becomes the new baseline template for that track+language — used by this endpoint's own PDF
+# conversion immediately, and by every future /tailor call for that track+language too.
+#
+# NOTE ON PERSISTENCE: this overwrites the template file on the running container's disk. On
+# Railway (see Dockerfile — templates are COPY'd into the image at build time) that survives
+# restarts but NOT a redeploy, since a redeploy rebuilds the container from the image and the
+# edit is gone unless a persistent volume is mounted. Fine for "no need to relaunch the app while
+# I'm working," not a durable long-term store.
 # ═══════════════════════════════════════════════════════════════════
-class ResumeSaveRequest(BaseModel):
-    track:       str
-    resume_lang: str = "en"
-    edits:       dict = {}   # {"<paraId>:<segmentIndex>": "new text"}
-
-
-@app.get("/resume-sections")
-def resume_sections(track: str, resume_lang: str = "en"):
-    """Returns every editable text segment in the track's resume, in document order, grouped
-    by paragraph and tagged with bold/italic so a client can render a faithful editor."""
+@app.get("/resume-docx")
+def resume_docx(track: str, resume_lang: str = "en"):
+    """Download the raw .docx template for a track+language, for editing in a real word processor."""
     template = TRACK_TEMPLATES.get(track, {}).get(resume_lang)
     if not template:
         raise HTTPException(400, f"No '{resume_lang}' resume template available yet for track '{track}'.")
     if not template["path"].exists():
         raise HTTPException(500, f"Template missing: {template['path'].name}")
 
-    with zipfile.ZipFile(io.BytesIO(template["path"].read_bytes()), "r") as zin:
-        xml = zin.read("word/document.xml").decode("utf-8")
+    filename = f"Vishal_Resume_{track}_{resume_lang}.docx"
+    return Response(
+        content=template["path"].read_bytes(),
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
-    sections = extract_editable_sections(xml, template["summary_para_id"])
-    return JSONResponse(content={"sections": sections})
 
-
-@app.post("/resume-save")
-def resume_save(req: ResumeSaveRequest):
-    """Applies a set of segment edits directly (no AI involved) and returns the updated PDF."""
-    template = TRACK_TEMPLATES.get(req.track, {}).get(req.resume_lang)
+@app.post("/resume-docx")
+async def resume_docx_save(
+    track:       str = Form(...),
+    resume_lang: str = Form("en"),
+    file:        UploadFile = File(...),
+):
+    """Upload an edited .docx: persist it as the new template for this track+language, and
+    return it converted to PDF."""
+    template = TRACK_TEMPLATES.get(track, {}).get(resume_lang)
     if not template:
-        raise HTTPException(
-            400, f"No '{req.resume_lang}' resume template available yet for track '{req.track}'."
-        )
-    if not template["path"].exists():
-        raise HTTPException(500, f"Template missing: {template['path'].name}")
+        raise HTTPException(400, f"No '{resume_lang}' resume template available yet for track '{track}'.")
 
-    with zipfile.ZipFile(io.BytesIO(template["path"].read_bytes()), "r") as zin:
-        names    = zin.namelist()
-        file_map = {n: zin.read(n) for n in names}
+    docx_bytes = await file.read()
+    try:
+        with zipfile.ZipFile(io.BytesIO(docx_bytes)) as zf:
+            if "word/document.xml" not in zf.namelist():
+                raise HTTPException(400, "That file doesn't look like a Word .docx (no word/document.xml).")
+    except zipfile.BadZipFile:
+        raise HTTPException(400, "That file isn't a valid .docx.")
 
-    xml = file_map["word/document.xml"].decode("utf-8")
-    if req.edits:
-        xml = apply_editable_sections(xml, req.edits)
-    file_map["word/document.xml"] = xml.encode("utf-8")
+    template["path"].write_bytes(docx_bytes)
 
-    out = io.BytesIO()
-    with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as zout:
-        for n in names:
-            zout.writestr(n, file_map[n])
-
-    pdf_bytes = docx_to_pdf(out.getvalue())
-    filename  = f"Vishal_Resume_{req.track}_edited.pdf"
+    pdf_bytes = docx_to_pdf(docx_bytes)
+    filename  = f"Vishal_Resume_{track}_{resume_lang}.pdf"
     headers   = {"Content-Disposition": f'attachment; filename="{filename}"'}
     return Response(content=pdf_bytes, media_type="application/pdf", headers=headers)

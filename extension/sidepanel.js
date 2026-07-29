@@ -27,9 +27,6 @@
 
   let analysisData = null;
   let lastExtractedUrl = null;
-  // Last AI-generated PROFESSIONAL SUMMARY text per "track:lang", so the online editor can seed
-  // itself with what's actually in the PDF you just downloaded instead of the static template default.
-  let lastSummaryByKey = {};
 
   function setStatus(msg, color) {
     const el = document.getElementById('rt-status');
@@ -114,18 +111,20 @@
   // BACKEND CALLS — plain fetch (this page is a normal extension document, not a userscript;
   // the backend's CORS config explicitly exposes X-Cover-Letter-Pdf for this to work cross-origin)
   // ─────────────────────────────────────────────────────────────
+  async function throwIfNotOk(res) {
+    if (res.ok) return;
+    let detail = `Server ${res.status}`;
+    try { const e = await res.json(); detail = e.detail || detail; } catch (_) { /* ignore */ }
+    throw new Error(detail);
+  }
+
   async function callBackend(path, payload, wantBlob) {
     const res = await fetch(BACKEND_URL + path, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
-
-    if (!res.ok) {
-      let detail = `Server ${res.status}`;
-      try { const e = await res.json(); detail = e.detail || detail; } catch (_) { /* ignore */ }
-      throw new Error(detail);
-    }
+    await throwIfNotOk(res);
 
     if (wantBlob) {
       const blob = await res.blob();
@@ -138,22 +137,7 @@
           blob._coverLetterPdf = new Blob([buf], { type: 'application/pdf' });
         } catch (err) { console.warn('CL PDF decode failed:', err); }
       }
-      const summaryB64 = res.headers.get('X-Summary-B64');
-      if (summaryB64) {
-        try { blob._summaryText = decodeURIComponent(escape(atob(summaryB64.trim()))); }
-        catch (err) { console.warn('Summary decode failed:', err); }
-      }
       return blob;
-    }
-    return res.json();
-  }
-
-  async function callBackendGet(path) {
-    const res = await fetch(BACKEND_URL + path);
-    if (!res.ok) {
-      let detail = `Server ${res.status}`;
-      try { const e = await res.json(); detail = e.detail || detail; } catch (_) { /* ignore */ }
-      throw new Error(detail);
     }
     return res.json();
   }
@@ -283,10 +267,6 @@
       };
 
       const pdfBlob = await callBackend('/tailor', payload, true);
-
-      if (pdfBlob._summaryText) {
-        lastSummaryByKey[`${track}:${resumeLang}`] = pdfBlob._summaryText;
-      }
 
       const companySlug = company.replace(/[^a-zA-Z0-9]/g,'_').slice(0,30);
       const roleSlug = ({
@@ -887,90 +867,89 @@
   });
 
   // ─────────────────────────────────────────────────────────────
-  // ONLINE RESUME EDITOR — edit any line of the resume and get an updated PDF straight back,
-  // no JD re-analysis, no Gemini call, no reloading the extension. Operates on whatever
-  // TRACK + RESUME LANGUAGE is currently selected in Controls.
+  // ONLINE RESUME EDITOR — download the real .docx for whatever TRACK + RESUME LANGUAGE is
+  // currently selected in Controls, edit it in a real word processor (full formatting freedom),
+  // upload it back. The upload becomes the new baseline for that track+language — including
+  // future "Generate Tailored Resume" runs — no JD re-analysis, no reloading the extension.
   // ─────────────────────────────────────────────────────────────
-  let editorSections = null;
+  function currentEditorTrackLang() {
+    return {
+      track: document.getElementById('rt-track').value,
+      resumeLang: document.getElementById('rt-resume-lang').value || 'en',
+    };
+  }
 
-  async function openEditor() {
-    const track = document.getElementById('rt-track').value;
-    const resumeLang = document.getElementById('rt-resume-lang').value || 'en';
-
-    const overlay = document.getElementById('rt-editor');
-    overlay.style.display = 'flex';
+  function openEditor() {
+    const { track, resumeLang } = currentEditorTrackLang();
+    document.getElementById('rt-editor').style.display = 'flex';
     document.getElementById('rt-edit-subtitle').textContent =
       `${TRACK_LABELS[track] || track} · ${resumeLang === 'de' ? 'Deutsch' : 'English'}`;
-    document.getElementById('rt-edit-body').innerHTML =
-      '<div class="rt-status">Loading resume content…</div>';
+    document.getElementById('rt-edit-file').value = '';
     document.getElementById('rt-edit-status').textContent = '';
-
-    try {
-      const data = await callBackendGet(
-        `/resume-sections?track=${encodeURIComponent(track)}&resume_lang=${encodeURIComponent(resumeLang)}`
-      );
-      editorSections = data.sections || [];
-
-      const seededSummary = lastSummaryByKey[`${track}:${resumeLang}`];
-      if (seededSummary) {
-        for (const sec of editorSections) {
-          if (sec.is_summary && sec.segments.length) sec.segments[0].text = seededSummary;
-        }
-      }
-
-      renderEditor(editorSections, !!seededSummary);
-    } catch (err) {
-      document.getElementById('rt-edit-body').innerHTML =
-        `<div class="rt-status" style="color:#ef4444;">❌ ${escapeHtml(err.message)}</div>`;
-    }
   }
 
   function closeEditor() {
     document.getElementById('rt-editor').style.display = 'none';
   }
 
-  function renderEditor(sections, seeded) {
-    const body = document.getElementById('rt-edit-body');
-    body.innerHTML = sections.map((sec) => {
-      const cls = sec.is_summary ? 'rt-edit-para rt-edit-summary' : 'rt-edit-para';
-      const badge = sec.is_summary
-        ? `<div class="rt-edit-summary-badge">✨ AI Summary${seeded ? ' (from last generation — edit freely)' : ' (template default)'}</div>`
-        : '';
-      const fields = sec.segments.map((seg) => {
-        const rows = Math.max(1, Math.min(6, Math.ceil(seg.text.length / 55)));
-        const style = `${seg.bold ? 'font-weight:700;' : ''}${seg.italic ? 'font-style:italic;' : ''}`;
-        return `<textarea class="rt-edit-seg" data-seg-id="${escapeHtml(seg.id)}" rows="${rows}" style="${style}">${escapeHtml(seg.text)}</textarea>`;
-      }).join('');
-      return `<div class="${cls}">${badge}${fields}</div>`;
-    }).join('');
+  async function downloadEditorDocx() {
+    const { track, resumeLang } = currentEditorTrackLang();
+    const statusEl = document.getElementById('rt-edit-status');
+    statusEl.style.color = '#8b87a8';
+    statusEl.textContent = 'Downloading…';
+    try {
+      const res = await fetch(
+        `${BACKEND_URL}/resume-docx?track=${encodeURIComponent(track)}&resume_lang=${encodeURIComponent(resumeLang)}`
+      );
+      await throwIfNotOk(res);
+      const blob = await res.blob();
+      const filename = `Vishal_Resume_${track}_${resumeLang}.docx`;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = filename; a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+      statusEl.style.color = '#10b981';
+      statusEl.textContent = `✅ ${filename} downloaded — edit it, then upload below.`;
+    } catch (err) {
+      statusEl.style.color = '#ef4444';
+      statusEl.textContent = '❌ ' + err.message;
+    }
   }
 
   async function saveEditor() {
-    const track = document.getElementById('rt-track').value;
-    const resumeLang = document.getElementById('rt-resume-lang').value || 'en';
+    const { track, resumeLang } = currentEditorTrackLang();
+    const fileInput = document.getElementById('rt-edit-file');
     const btn = document.getElementById('rt-edit-save');
     const statusEl = document.getElementById('rt-edit-status');
 
-    const edits = {};
-    document.querySelectorAll('#rt-edit-body .rt-edit-seg').forEach((ta) => {
-      edits[ta.dataset.segId] = ta.value;
-    });
+    const file = fileInput.files[0];
+    if (!file) {
+      statusEl.style.color = '#f59e0b';
+      statusEl.textContent = '⚠️ Choose your edited .docx file first.';
+      return;
+    }
 
     btn.disabled = true;
-    btn.textContent = '⏳ Saving…';
-    statusEl.textContent = '';
+    btn.textContent = '⏳ Uploading…';
     statusEl.style.color = '#8b87a8';
-    statusEl.textContent = 'Regenerating PDF from your edits…';
+    statusEl.textContent = 'Uploading and converting to PDF…';
 
     try {
-      const pdfBlob = await callBackend('/resume-save', { track, resume_lang: resumeLang, edits }, true);
-      const filename = `Vishal_Resume_${track}_edited.pdf`;
+      const form = new FormData();
+      form.append('track', track);
+      form.append('resume_lang', resumeLang);
+      form.append('file', file);
+
+      const res = await fetch(`${BACKEND_URL}/resume-docx`, { method: 'POST', body: form });
+      await throwIfNotOk(res);
+      const pdfBlob = await res.blob();
+      const filename = `Vishal_Resume_${track}_${resumeLang}.pdf`;
       const url = URL.createObjectURL(pdfBlob);
       const a = document.createElement('a');
       a.href = url; a.download = filename; a.click();
       setTimeout(() => URL.revokeObjectURL(url), 5000);
       statusEl.style.color = '#10b981';
-      statusEl.textContent = `✅ ${filename} downloaded!`;
+      statusEl.textContent = `✅ Saved as the new baseline — ${filename} downloaded!`;
     } catch (err) {
       statusEl.style.color = '#ef4444';
       statusEl.textContent = '❌ ' + err.message;
@@ -990,6 +969,7 @@
     document.getElementById('rt-go').onclick      = runTailor;
     document.getElementById('rt-edit-open').onclick = openEditor;
     document.getElementById('rt-edit-back').onclick = closeEditor;
+    document.getElementById('rt-edit-download').onclick = downloadEditorDocx;
     document.getElementById('rt-edit-save').onclick = saveEditor;
     document.getElementById('rt-autofill-start').onclick = runAutofillOnPage;
     document.getElementById('rt-scan-start').onclick  = () => startBulkScan();

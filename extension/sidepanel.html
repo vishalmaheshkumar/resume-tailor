@@ -145,8 +145,8 @@
 
   </div>
 
-  <!-- Online resume editor — full-panel overlay so there's room to work with every line of the
-       resume, without leaving the extension or re-running JD analysis. -->
+  <!-- Online resume editor — download the real .docx, edit it in Word/Google Docs/Pages (full
+       formatting freedom), upload it back. No JD re-analysis, no leaving the extension. -->
   <div id="rt-editor" style="display:none;position:fixed;inset:0;background:#100f1a;z-index:50;flex-direction:column;">
     <div class="rt-header">
       <div class="rt-header-left">
@@ -157,7 +157,25 @@
         </div>
       </div>
     </div>
-    <div id="rt-edit-body" class="rt-body"></div>
+    <div id="rt-edit-body" class="rt-body">
+      <div class="rt-card">
+        <div class="rt-section-label">1. Download</div>
+        <div style="font-size:11.5px;color:#8b87a8;margin-bottom:10px;line-height:1.5;">
+          Downloads the actual .docx for this track + language. Open it in Word, Google Docs, or
+          Pages and edit anything — text, formatting, sections — full freedom.
+        </div>
+        <button id="rt-edit-download" class="rt-btn-secondary">⬇️ Download resume.docx</button>
+      </div>
+
+      <div class="rt-card">
+        <div class="rt-section-label">2. Upload your edited version</div>
+        <div style="font-size:11.5px;color:#8b87a8;margin-bottom:10px;line-height:1.5;">
+          Uploading replaces the resume used for this track + language from now on — including
+          future "Generate Tailored Resume" runs — until you upload again.
+        </div>
+        <input id="rt-edit-file" type="file" accept=".docx" class="rt-input" style="padding:8px;">
+      </div>
+    </div>
     <div style="padding:14px 20px;border-top:1px solid #232032;flex-shrink:0;display:flex;flex-direction:column;gap:8px;">
       <div id="rt-edit-status" class="rt-status"></div>
       <button id="rt-edit-save" class="rt-btn-primary">💾 Save &amp; Download PDF</button>
