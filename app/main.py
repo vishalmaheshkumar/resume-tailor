@@ -1303,7 +1303,13 @@ def docx_to_pdf(docx_bytes: bytes, link_map: dict = None) -> bytes:
         # process/thread budget is exhausted — even though the binary is still present and
         # /health still reports it as installed. Fine for this single-user backend's low
         # concurrency; a busier deployment would want a proper process pool instead.
-        subprocess.run(["pkill", "-9", "-f", "soffice.bin"], capture_output=True)
+        # Best-effort itself needs a fork — if the container is already out of process/thread
+        # budget (the exact condition this line exists to prevent), even this call can raise
+        # OSError. Swallow it; the Popen below will surface a clear error if things are still bad.
+        try:
+            subprocess.run(["pkill", "-9", "-f", "soffice.bin"], capture_output=True)
+        except OSError:
+            pass
 
         # Explicit FilterData ensures hyperlinks are exported as clickable Annotations
         # in the PDF (not all LibreOffice builds default this to true)
@@ -1324,8 +1330,14 @@ def docx_to_pdf(docx_bytes: bytes, link_map: dict = None) -> bytes:
             f"-env:UserInstallation=file://{profile_dir}",
             "--convert-to", pdf_filter, "--outdir", tmpdir, str(docx_path),
         ]
-        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                                 start_new_session=True)
+        try:
+            proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                     start_new_session=True)
+        except OSError as ex:
+            # Surfaces as a real error instead of an unhandled crash (bare 500, no body) when the
+            # container can't fork a new process — e.g. its process/thread budget is exhausted by
+            # accumulated orphaned soffice.bin instances, per the pkill note above.
+            raise HTTPException(500, f"Failed to launch LibreOffice: {ex}")
         try:
             stdout, stderr = proc.communicate(timeout=60)
         except subprocess.TimeoutExpired:

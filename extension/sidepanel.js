@@ -34,6 +34,16 @@
     el.style.color = color || '#8b87a8';
   }
 
+  // Chrome never allows content-script injection into these — attempting it always throws
+  // ("Cannot access contents of url ..."), so check up front instead of letting sendToContentScript
+  // fail into a console error every time the user switches to a new-tab page, settings, etc.
+  function isRestrictedUrl(url) {
+    if (!url) return true;
+    return /^(chrome|edge|about|devtools|view-source|chrome-extension):/i.test(url) ||
+      /^https:\/\/chrome\.google\.com\/webstore/i.test(url) ||
+      /^https:\/\/chromewebstore\.google\.com/i.test(url);
+  }
+
   function detectSiteLabel(url) {
     try {
       const h = new URL(url).hostname;
@@ -93,6 +103,11 @@
 
     document.getElementById('rt-site-label').textContent = detectSiteLabel(tab.url || '');
     lastExtractedUrl = tab.url;
+
+    if (isRestrictedUrl(tab.url)) {
+      setStatus('ℹ️ Open a job posting tab, then click Re-extract.', '#8b87a8');
+      return;
+    }
 
     const response = await sendExtractMessage(tab.id);
     if (!response) {
