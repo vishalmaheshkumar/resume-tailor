@@ -3,7 +3,7 @@
   "name": "Resume Tailor — Side Panel",
   "version": "1.0",
   "description": "Docked AI side panel for strategic multi-track resume tailoring — JD auto-extraction, fit scoring, ATS keyword gaps, and one-click tailored PDF generation.",
-  "permissions": ["activeTab", "tabs", "scripting", "sidePanel", "notifications"],
+  "permissions": ["activeTab", "tabs", "scripting", "sidePanel", "notifications", "storage"],
   "host_permissions": ["<all_urls>"],
   "icons": { "16": "icon16.png", "48": "icon48.png", "128": "icon128.png" },
   "background": {

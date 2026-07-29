@@ -55,22 +55,32 @@
   }
 
   // ─────────────────────────────────────────────────────────────
+  // CONTENT-SCRIPT MESSAGING — every call into content.js goes through here. A failure almost
+  // always means "Could not establish connection", i.e. content.js never attached, typically
+  // because the tab was already open before the extension was installed/reloaded. Inject it on
+  // demand and retry once, instead of just failing. Throws if the retry also fails.
+  // ─────────────────────────────────────────────────────────────
+  async function sendToContentScript(tabId, msg) {
+    try {
+      return await chrome.tabs.sendMessage(tabId, msg);
+    } catch (_) {
+      await chrome.scripting.executeScript({ target: { tabId }, files: ['content.js'] });
+      return await chrome.tabs.sendMessage(tabId, msg);
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────
   // AUTO-EXTRACT — ask content.js to read the current tab's JD, then analyze
   // ─────────────────────────────────────────────────────────────
   async function sendExtractMessage(tabId) {
+    // Unlike the other call sites, extraction fires automatically on every tab switch — a page
+    // we simply can't inject into (chrome:// pages, the web store) is routine, not an error
+    // worth surfacing. Soften the throw into null; runExtract shows a hint instead.
     try {
-      return await chrome.tabs.sendMessage(tabId, { type: 'RT_EXTRACT' });
-    } catch (_) {
-      // "Could not establish connection" almost always means content.js never attached —
-      // typically because this tab was already open before the extension was installed/reloaded.
-      // Inject it on demand and retry once, instead of just failing.
-      try {
-        await chrome.scripting.executeScript({ target: { tabId }, files: ['content.js'] });
-        return await chrome.tabs.sendMessage(tabId, { type: 'RT_EXTRACT' });
-      } catch (err2) {
-        console.warn('[Resume Tailor] content script injection retry failed:', err2);
-        return null;
-      }
+      return await sendToContentScript(tabId, { type: 'RT_EXTRACT' });
+    } catch (err) {
+      console.warn('[Resume Tailor] content script injection retry failed:', err);
+      return null;
     }
   }
 
@@ -379,7 +389,7 @@
     setScanStatus(autoLaunch ? 'Starting scan + auto-launch…' : 'Starting scan…');
 
     try {
-      const response = await sendBulkMessage(tab.id, { type: 'RT_BULK_SCAN_START', options: { maxPages, maxJobs, resolveApplyLinks, autoLaunch } });
+      const response = await sendToContentScript(tab.id, { type: 'RT_BULK_SCAN_START', options: { maxPages, maxJobs, resolveApplyLinks, autoLaunch } });
       const rawResults = response?.results || [];
 
       let newCount = 0, seenCount = 0;
@@ -413,19 +423,42 @@
     document.getElementById('rt-scan-stop').style.display = 'none';
   }
 
-  async function sendBulkMessage(tabId, msg) {
-    try {
-      return await chrome.tabs.sendMessage(tabId, msg);
-    } catch (_) {
-      await chrome.scripting.executeScript({ target: { tabId }, files: ['content.js'] });
-      return await chrome.tabs.sendMessage(tabId, msg);
+  // ─────────────────────────────────────────────────────────────
+  // SETTINGS — Gemini API key for AI Autofill. Stored in chrome.storage.local (this device only,
+  // never synced, never sent anywhere but directly to Google's API). background.js reads it at
+  // call time instead of a hardcoded constant in source.
+  // ─────────────────────────────────────────────────────────────
+  function setGeminiKeyStatus(msg, color) {
+    const el = document.getElementById('rt-gemini-key-status');
+    el.style.color = color;
+    el.textContent = msg;
+  }
+
+  async function loadGeminiKeyIntoUI() {
+    const { geminiApiKey } = await chrome.storage.local.get('geminiApiKey');
+    if (geminiApiKey) {
+      document.getElementById('rt-gemini-key').value = geminiApiKey;
+      setGeminiKeyStatus(`✅ Configured (…${geminiApiKey.slice(-4)})`, '#10b981');
+    } else {
+      setGeminiKeyStatus('⚠️ Not set — AI Autofill won\'t work until you add one.', '#f59e0b');
     }
+  }
+
+  async function saveGeminiKey() {
+    const key = document.getElementById('rt-gemini-key').value.trim();
+    if (!key) {
+      setGeminiKeyStatus('⚠️ Paste a key first.', '#f59e0b');
+      return;
+    }
+    await chrome.storage.local.set({ geminiApiKey: key });
+    setGeminiKeyStatus(`✅ Saved (…${key.slice(-4)})`, '#10b981');
   }
 
   // ─────────────────────────────────────────────────────────────
   // APPLICATION AUTOFILL — runs on whatever page is currently active (the application form),
-  // not the job-tailoring fields above. content.js does the extraction/fill; the Gemini call
-  // happens server-side via POST /autofill, so no API key ever ships in this extension.
+  // not the job-tailoring fields above. content.js does the extraction; background.js calls
+  // Gemini directly (using the key from Settings above) since a content script's fetch is still
+  // subject to the host page's CSP, which silently blocks it on many ATS sites.
   // ─────────────────────────────────────────────────────────────
   async function runAutofillOnPage() {
     const tab = await getActiveTab();
@@ -441,7 +474,7 @@
     statusEl.textContent = 'Reading form fields and asking Gemini…';
 
     try {
-      const result = await sendBulkMessage(tab.id, { type: 'RT_AUTOFILL' });
+      const result = await sendToContentScript(tab.id, { type: 'RT_AUTOFILL' });
       if (!result || !result.ok) {
         statusEl.textContent = '❌ ' + (result?.error || 'Autofill failed.');
       } else {
@@ -676,7 +709,7 @@
           updateTask(task, task.statusText + ' · ⚡ Easy Apply — no LinkedIn tab open; open your search results and try again.');
           return;
         }
-        const result = await sendBulkMessage(tab.id, { type: 'RT_SHOW_JOB', jobTitle: job.title, jobCompany: job.company });
+        const result = await sendToContentScript(tab.id, { type: 'RT_SHOW_JOB', jobTitle: job.title, jobCompany: job.company });
         updateTask(task, task.statusText + (result?.found
           ? ' · ⚡ Easy Apply — brought that job into view, apply directly in that tab.'
           : ' · ⚡ Easy Apply — couldn\'t find its card in the current list; find it manually and apply there.'));
@@ -695,7 +728,7 @@
           updateTask(task, task.statusText + ' · ❌ No LinkedIn tab open — open your search results and try again.');
           return;
         }
-        const result = await sendBulkMessage(tab.id, {
+        const result = await sendToContentScript(tab.id, {
           type: 'RT_RESOLVE_APPLY_URL',
           jobKey: job.job_key || window.RTJobStore.jobKey(job),
           jobTitle: job.title, jobCompany: job.company,
@@ -812,7 +845,7 @@
 
     let result;
     try {
-      result = await sendBulkMessage(tabId, { type: 'RT_CHECK_DESTINATION_PAGE' });
+      result = await sendToContentScript(tabId, { type: 'RT_CHECK_DESTINATION_PAGE' });
     } catch (err) {
       updateDestStatus(task, `❌ Couldn't read that page: ${err.message}`);
       return;
@@ -841,7 +874,7 @@
   async function runAutofillOnTab(task, tabId, jobLabel) {
     updateDestStatus(task, 'Autofilling application form…');
     try {
-      const result = await sendBulkMessage(tabId, { type: 'RT_AUTOFILL' });
+      const result = await sendToContentScript(tabId, { type: 'RT_AUTOFILL' });
       if (!result || !result.ok) {
         updateDestStatus(task, '⚠️ ' + (result?.error || 'Autofill failed — fill the form manually.'));
         notifyUser('Check needed', jobLabel);
@@ -964,6 +997,9 @@
   // switches tabs or navigates to a new job (panel state persists across both).
   // ─────────────────────────────────────────────────────────────
   function init() {
+    document.getElementById('rt-gemini-key-save').onclick = saveGeminiKey;
+    loadGeminiKeyIntoUI();
+
     document.getElementById('rt-extract').onclick = runExtract;
     document.getElementById('rt-analyze').onclick = runAnalyze;
     document.getElementById('rt-go').onclick      = runTailor;

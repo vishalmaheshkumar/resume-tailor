@@ -16,10 +16,17 @@ importScripts('db.js');
 // request to a domain not on their own allowlist, which is why this was failing silently before.
 // The service worker isn't a document and has no CSP of its own, only this extension's
 // host_permissions — so it's the only place this call reliably works on every site.
+//
+// The key itself lives in chrome.storage.local (set via the Settings card in the side panel),
+// not in source — read fresh on every call instead of a hardcoded constant.
 // ─────────────────────────────────────────────────────────────
-const GEMINI_KEY = 'AIzaSyA4_T3satJ1lCIbZEO3kWP4_497j0rVuSA';
 const GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.5-flash-lite-preview-06-17'];
-const geminiUrl = (model) => `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_KEY}`;
+const geminiUrl = (model, key) => `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
+
+async function getGeminiKey() {
+  const { geminiApiKey } = await chrome.storage.local.get('geminiApiKey');
+  return (geminiApiKey || '').trim();
+}
 
 const MY_PROFILE = `
 === PERSONAL INFORMATION ===
@@ -187,6 +194,11 @@ Include every field you can fill.`;
 }
 
 async function callGeminiWithFallback(pageContext, fields) {
+  const key = await getGeminiKey();
+  if (!key) {
+    throw new Error('No Gemini API key configured — open the side panel and add one under Settings.');
+  }
+
   const prompt = buildAutofillPrompt(pageContext, fields);
   const body = JSON.stringify({
     contents: [{ parts: [{ text: prompt }] }],
@@ -196,7 +208,7 @@ async function callGeminiWithFallback(pageContext, fields) {
   let lastErr;
   for (const model of GEMINI_MODELS) {
     try {
-      const res = await fetch(geminiUrl(model), {
+      const res = await fetch(geminiUrl(model, key), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body,

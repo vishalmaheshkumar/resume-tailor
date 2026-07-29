@@ -18,6 +18,16 @@
 
   <div class="rt-body">
 
+    <div class="rt-card">
+      <div class="rt-section-label">⚙️ Settings</div>
+      <div class="rt-field" style="margin-bottom:8px;">
+        <label>GEMINI API KEY <span style="font-weight:400;">(used by AI Autofill, stored only on this device)</span></label>
+        <input id="rt-gemini-key" class="rt-input" type="password" placeholder="Paste your Gemini API key…" autocomplete="off">
+      </div>
+      <button id="rt-gemini-key-save" class="rt-btn-secondary">💾 Save Key</button>
+      <div id="rt-gemini-key-status" class="rt-status" style="margin-top:6px;"></div>
+    </div>
+
     <button id="rt-extract" class="rt-btn-secondary">🔎 Re-extract from page</button>
 
     <div id="rt-tasks-card" class="rt-card" style="display:none;">
