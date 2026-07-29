@@ -602,7 +602,23 @@ async def call_gemini(prompt: str, temp: float = 0.35, max_tokens: int = 6000) -
                     last_error = f"{model}: {data['error'].get('message','')}"
                     continue
 
-                text = data["candidates"][0]["content"]["parts"][0]["text"]
+                # Gemini can 200 with no usable text: prompt blocked upfront (no "candidates" at
+                # all, see promptFeedback.blockReason), or a thinking-capable model (e.g. the
+                # gemini-3.x previews above) burning the whole maxOutputTokens budget on hidden
+                # reasoning and hitting MAX_TOKENS before emitting any visible parts. Treat both
+                # as a soft failure — try the next model — instead of letting the KeyError/
+                # IndexError escape as an unhandled 500.
+                candidates = data.get("candidates") or []
+                if not candidates:
+                    block_reason = data.get("promptFeedback", {}).get("blockReason", "no candidates")
+                    last_error = f"{model}: blocked/empty response ({block_reason})"
+                    continue
+                parts = candidates[0].get("content", {}).get("parts") or []
+                text = "".join(p.get("text", "") for p in parts if not p.get("thought"))
+                if not text.strip():
+                    finish_reason = candidates[0].get("finishReason", "unknown")
+                    last_error = f"{model}: empty response text (finishReason={finish_reason})"
+                    continue
                 text = re.sub(r"^```(?:json)?\s*", "", text).strip().rstrip("` \n")
                 # Most prompts ask for a top-level object; /autofill asks for a top-level array —
                 # slice out whichever bracket pair appears first (object vs array), not just "{...}".
@@ -622,6 +638,9 @@ async def call_gemini(prompt: str, temp: float = 0.35, max_tokens: int = 6000) -
                 continue
             except json.JSONDecodeError as ex:
                 last_error = f"{model}: JSON — {ex}"
+                continue
+            except (KeyError, IndexError, TypeError, AttributeError) as ex:
+                last_error = f"{model}: unexpected response shape — {ex}"
                 continue
 
     raise HTTPException(503, f"All Gemini models failed. Last: {last_error}")
